@@ -83,6 +83,73 @@ pub fn create(
     create_with_metadata(repository, entry_type, title, body, BTreeMap::new())
 }
 
+/// Create a Work with the links implied by one Plan task.
+///
+/// The task reference is intentionally required to be canonical and fully
+/// qualified. The Plan's Delivery Map row identifies the Goal item; the
+/// resulting direct `fulfills` link keeps the existing Goal Coverage contract
+/// intact while the `implements` link preserves the task-level provenance.
+pub fn create_work_for_task(
+    repository: &Repository,
+    task_reference: &str,
+    title: String,
+    body: String,
+) -> Result<Entry, BelayError> {
+    if title.trim().is_empty() {
+        return validation("entry title must not be empty");
+    }
+    if title.contains('\0') || body.contains('\0') {
+        return validation("entry title and body must not contain NUL characters");
+    }
+    let task = parse_entry_reference_id(task_reference)?;
+    if task_reference != task.canonical_id() || task.fragment.is_none() {
+        return validation(format!(
+            "work task must be a canonical full Plan task reference such as PLN-...#t-001; got {task_reference:?}"
+        ));
+    }
+
+    let now = now();
+    let timestamp = format_timestamp(&now);
+    let database_path = repository.database_path();
+    let mut connection = database::open(&database_path)?;
+    let transaction = begin_immediate(&mut connection, &database_path)?;
+    let goal = derive_work_goal(&transaction, &database_path, &task)?;
+    let entry = Entry {
+        display_id: allocate_display_id(
+            &transaction,
+            &repository.entries_path(),
+            EntryType::Work,
+            &now,
+            &title,
+        )?,
+        entry_type: EntryType::Work,
+        title,
+        status: EntryType::Work.default_status(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp.clone(),
+        revision: 1,
+        tags: Vec::new(),
+        links: vec![
+            EntryLink {
+                relation: LinkRelation::Implements,
+                id: task.canonical_id(),
+                metadata: BTreeMap::new(),
+            },
+            EntryLink {
+                relation: LinkRelation::Fulfills,
+                id: goal.canonical_id(),
+                metadata: BTreeMap::new(),
+            },
+        ],
+        metadata: BTreeMap::new(),
+        body,
+    }
+    .normalized()?;
+    persist_new_entry(repository, &transaction, &database_path, &entry, &timestamp)?;
+    transaction.commit()?;
+    Ok(entry)
+}
+
 pub(crate) fn create_with_metadata(
     repository: &Repository,
     entry_type: EntryType,
@@ -214,48 +281,7 @@ fn create_with_metadata_internal(
         body,
     }
     .normalized()?;
-    let relative_path = mirror_relative_path(repository, &entry);
-    let source_path = path_to_storage_string(&relative_path)?;
-    let destination = repository.belay_dir.join(&relative_path);
-    let rendered = markdown::render(&entry)?;
-    let hash = markdown::content_hash(&entry)?;
-    let chunks = markdown::generate_chunks(&entry.body);
-
-    transaction
-        .execute(
-            "
-            INSERT INTO entries(
-                display_id, type, title, status, created_at, updated_at, revision,
-                body, metadata_json, source_path, content_hash
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-            ",
-            params![
-                entry.display_id,
-                entry.entry_type.to_string(),
-                entry.title,
-                entry.status.to_string(),
-                entry.created_at,
-                entry.updated_at,
-                entry.revision,
-                entry.body,
-                serialize_metadata(&entry.metadata)?,
-                source_path,
-                hash,
-            ],
-        )
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
-    let internal_id = transaction.last_insert_rowid();
-    replace_tags(&transaction, &database_path, internal_id, &entry.tags)?;
-    replace_chunks_and_fts(&transaction, &database_path, internal_id, &entry, &chunks)?;
-    upsert_sync_state(
-        &transaction,
-        &database_path,
-        internal_id,
-        &source_path,
-        &hash,
-        &timestamp,
-    )?;
-    write_new_file(repository, &destination, rendered.as_bytes())?;
+    persist_new_entry(repository, &transaction, &database_path, &entry, &timestamp)?;
     if let Some(receipt) = receipt {
         insert_route_receipt(
             &transaction,
@@ -275,6 +301,200 @@ fn create_with_metadata_internal(
         replayed: false,
         post_revision,
     })
+}
+
+fn persist_new_entry(
+    repository: &Repository,
+    connection: &Connection,
+    database_path: &Path,
+    entry: &Entry,
+    synced_at: &str,
+) -> Result<(), BelayError> {
+    let relative_path = mirror_relative_path(repository, entry);
+    let source_path = path_to_storage_string(&relative_path)?;
+    let destination = repository.belay_dir.join(&relative_path);
+    let internal_id = insert_entry(connection, database_path, entry, &source_path)?;
+    replace_links(connection, database_path, internal_id, &entry.links)?;
+    let hash = markdown::content_hash(entry)?;
+    upsert_sync_state(
+        connection,
+        database_path,
+        internal_id,
+        &source_path,
+        &hash,
+        synced_at,
+    )?;
+    let rendered = markdown::render(entry)?;
+    write_new_file(repository, &destination, rendered.as_bytes())?;
+    Ok(())
+}
+
+fn derive_work_goal(
+    connection: &Connection,
+    database_path: &Path,
+    task: &EntryReferenceParts,
+) -> Result<EntryReferenceParts, BelayError> {
+    let task_fragment = task
+        .fragment
+        .as_deref()
+        .ok_or_else(|| BelayError::Validation {
+            message: "work task must include a Plan fragment such as #t-001".to_owned(),
+        })?;
+    let plan_internal_id = resolve_internal_id(connection, database_path, &task.display_id)?;
+    let plan = load_entry(connection, database_path, plan_internal_id)?;
+    if plan.entry_type != EntryType::Plan {
+        return validation(format!(
+            "work task target {} is {}, not a plan",
+            task.display_id, plan.entry_type
+        ));
+    }
+    validate_reference_fragment(connection, database_path, task)?;
+    let rows = crate::trace_ids::delivery_map_rows(&plan.body)
+        .into_iter()
+        .filter(|row| row.id.eq_ignore_ascii_case(task_fragment))
+        .collect::<Vec<_>>();
+    let row = match rows.as_slice() {
+        [row] => row,
+        [] => {
+            return validation(format!(
+                "Plan {} task #{} has no Delivery Map row",
+                plan.display_id, task_fragment
+            ));
+        }
+        many => {
+            return validation(format!(
+                "Plan {} task #{} is ambiguous ({} definitions)",
+                plan.display_id,
+                task_fragment,
+                many.len()
+            ));
+        }
+    };
+    let goal_item = row
+        .cell("goal item")
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| BelayError::Validation {
+            message: format!(
+                "Plan {} task #{} has no Goal item",
+                plan.display_id, task_fragment
+            ),
+        })?;
+
+    let plan_goals = plan_goal_links(connection, database_path, &plan)?;
+    if plan_goals.is_empty() {
+        return validation(format!(
+            "Plan {} has no fulfills link to a Goal",
+            plan.display_id
+        ));
+    }
+
+    let goal = if goal_item.starts_with("GOAL-") {
+        let goal = parse_entry_reference_id(goal_item)?;
+        if goal_item != goal.canonical_id() || goal.fragment.is_none() {
+            return validation(format!(
+                "Plan {} task #{} Goal item must be a canonical full Goal criterion reference; got {goal_item:?}",
+                plan.display_id, task_fragment
+            ));
+        }
+        ensure_goal_reference(connection, database_path, &goal)?;
+        if !plan_goals.iter().any(|link| {
+            link.display_id == goal.display_id
+                && (link.fragment.is_none() || link.fragment == goal.fragment)
+        }) {
+            return validation(format!(
+                "Plan {} task #{} Goal item {} is not covered by a Plan fulfills link",
+                plan.display_id, task_fragment, goal_item
+            ));
+        }
+        goal
+    } else {
+        if plan_goals.len() != 1 {
+            return validation(format!(
+                "Plan {} has {} Goal links; use a fully qualified Goal item reference",
+                plan.display_id,
+                plan_goals.len()
+            ));
+        }
+        if goal_item != goal_item.to_ascii_uppercase()
+            || !crate::trace_ids::valid_reference_fragment(EntryType::Goal, goal_item)
+        {
+            return validation(format!(
+                "Plan {} task #{} Goal item must use canonical SC-NNN form; got {goal_item:?}",
+                plan.display_id, task_fragment
+            ));
+        }
+        let matching = plan_goals
+            .iter()
+            .filter(|link| {
+                link.fragment
+                    .as_deref()
+                    .is_none_or(|fragment| fragment.eq_ignore_ascii_case(goal_item))
+            })
+            .collect::<Vec<_>>();
+        let link = match matching.as_slice() {
+            [link] => *link,
+            [] => {
+                return validation(format!(
+                    "Plan {} task #{} Goal item {} is ambiguous or not covered by a Plan fulfills link",
+                    plan.display_id, task_fragment, goal_item
+                ));
+            }
+            many => {
+                return validation(format!(
+                    "Plan {} task #{} Goal item {} matches {} Goal links; use a fully qualified reference",
+                    plan.display_id,
+                    task_fragment,
+                    goal_item,
+                    many.len()
+                ));
+            }
+        };
+        EntryReferenceParts {
+            display_id: link.display_id.clone(),
+            fragment: Some(goal_item.to_ascii_lowercase()),
+        }
+    };
+    ensure_goal_reference(connection, database_path, &goal)?;
+    Ok(goal)
+}
+
+fn plan_goal_links(
+    connection: &Connection,
+    database_path: &Path,
+    plan: &Entry,
+) -> Result<Vec<EntryReferenceParts>, BelayError> {
+    let mut goals = Vec::new();
+    for link in &plan.links {
+        if link.relation != LinkRelation::Fulfills {
+            continue;
+        }
+        let reference = parse_entry_reference_id(&link.id)?;
+        let internal_id = resolve_internal_id(connection, database_path, &reference.display_id)?;
+        let target = load_entry(connection, database_path, internal_id)?;
+        if target.entry_type != EntryType::Goal {
+            continue;
+        }
+        validate_reference_fragment(connection, database_path, &reference)?;
+        goals.push(reference);
+    }
+    Ok(goals)
+}
+
+fn ensure_goal_reference(
+    connection: &Connection,
+    database_path: &Path,
+    reference: &EntryReferenceParts,
+) -> Result<(), BelayError> {
+    let internal_id = resolve_internal_id(connection, database_path, &reference.display_id)?;
+    let target = load_entry(connection, database_path, internal_id)?;
+    if target.entry_type != EntryType::Goal {
+        return validation(format!(
+            "Work Goal target {} is {}, not a goal",
+            reference.display_id, target.entry_type
+        ));
+    }
+    validate_reference_fragment(connection, database_path, reference)
 }
 
 pub fn show(repository: &Repository, reference: &str) -> Result<ShownEntry, BelayError> {

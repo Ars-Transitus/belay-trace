@@ -63,6 +63,7 @@ fn top_level_help_describes_commands_workflow_and_exit_categories() {
         "Workflow groups:",
         "init",
         "add",
+        "work",
         "link",
         "status",
         "sync",
@@ -82,8 +83,8 @@ fn top_level_help_describes_commands_workflow_and_exit_categories() {
 #[test]
 fn every_command_help_has_the_required_structure() {
     for command in [
-        "init", "add", "link", "status", "show", "search", "browse", "context", "archive", "route",
-        "sync", "rebuild", "export", "doctor",
+        "init", "add", "work", "link", "status", "show", "search", "browse", "context", "archive",
+        "route", "sync", "rebuild", "export", "doctor",
     ] {
         let output = belay()
             .args([command, "--help"])
@@ -1055,6 +1056,36 @@ const CONFORMING_PLAN: &str = concat!(
     "- **Verification**: `cargo test`.\n",
 );
 
+const TRACEABLE_GOAL: &str = concat!(
+    "## Summary\n\n",
+    "- A traceable goal.\n\n",
+    "## Success Criteria\n\n",
+    "- [SC-001] The implementation is traceable.\n\n",
+    "## Constraints\n\n",
+    "- Keep the change local.\n\n",
+    "## Non-goals\n\n",
+    "- No unrelated changes.\n\n",
+    "## Verification\n\n",
+    "- Run the focused test.\n\n",
+    "## Risks\n\n",
+    "- Mapping may be incomplete.\n",
+);
+
+const TRACEABLE_GOAL_TWO: &str = concat!(
+    "## Summary\n\n",
+    "- A second traceable goal.\n\n",
+    "## Success Criteria\n\n",
+    "- [SC-002] The second implementation is traceable.\n\n",
+    "## Constraints\n\n",
+    "- Keep the change local.\n\n",
+    "## Non-goals\n\n",
+    "- No unrelated changes.\n\n",
+    "## Verification\n\n",
+    "- Run the focused test.\n\n",
+    "## Risks\n\n",
+    "- Mapping may be incomplete.\n",
+);
+
 fn add_plan(temporary: &tempfile::TempDir, title: &str, body: &str) -> String {
     created_id(
         &belay()
@@ -1267,6 +1298,363 @@ fn sync_accepts_a_link_that_targets_a_task_fragment() {
     assert!(
         synced.status.success() && !stderr.contains("links to missing entry"),
         "sync must not treat a fragment target as a missing entry: {synced:?}"
+    );
+}
+
+#[test]
+fn work_create_derives_goal_links_and_supports_machine_output() {
+    let temporary = initialize_repository();
+    let goal = created_id(
+        &belay()
+            .args([
+                "add",
+                "goal",
+                "--title",
+                "Traceable goal",
+                "--body",
+                TRACEABLE_GOAL,
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add goal"),
+    );
+    let plan = add_plan(&temporary, "Traceable plan", CONFORMING_PLAN);
+    let plan_link = belay()
+        .args(["link", &plan, &goal, "--relation", "fulfills"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("link plan to goal");
+    assert!(plan_link.status.success(), "{plan_link:?}");
+
+    let task = format!("{plan}#t-001");
+    let created = belay()
+        .args([
+            "work",
+            "create",
+            "--task",
+            &task,
+            "--title",
+            "Implement traceability",
+            "--body",
+            "Implementation body",
+            "--format",
+            "id",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("create work");
+    assert!(created.status.success(), "{created:?}");
+    let work = String::from_utf8(created.stdout)
+        .expect("work ID is UTF-8")
+        .trim()
+        .to_owned();
+    assert!(work.starts_with("WRK-"), "{work}");
+    assert!(!work.contains("Created"), "{work}");
+
+    let shown = belay()
+        .args(["show", &work])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show created work");
+    assert!(shown.status.success(), "{shown:?}");
+    let shown = String::from_utf8(shown.stdout).expect("show stdout");
+    assert!(shown.contains(&format!("- implements {task}")), "{shown}");
+    assert!(
+        shown.contains(&format!("- fulfills {goal}#sc-001")),
+        "{shown}"
+    );
+
+    let mirror =
+        fs::read_to_string(mirror_path(temporary.path(), "work", &work)).expect("read work mirror");
+    assert!(mirror.contains(&format!("id: {task}")), "{mirror}");
+    assert!(mirror.contains(&format!("id: {goal}#sc-001")), "{mirror}");
+
+    let connection =
+        Connection::open(temporary.path().join(".belay/state/belay.sqlite")).expect("open DB");
+    let work_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM entries WHERE type = 'work'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count Work entries");
+    let link_count: i64 = connection
+        .query_row(
+            "
+            SELECT COUNT(*)
+            FROM entry_links
+            JOIN entries source ON source.id = entry_links.from_entry_id
+            WHERE source.display_id = ?1
+            ",
+            [&work],
+            |row| row.get(0),
+        )
+        .expect("count Work links");
+    assert_eq!(work_count, 1);
+    assert_eq!(link_count, 2);
+
+    let json = belay()
+        .args([
+            "work",
+            "create",
+            "--task",
+            &task,
+            "--title",
+            "Implement traceability JSON",
+            "--body",
+            "Second implementation body",
+            "--format",
+            "json",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("create JSON work");
+    assert!(json.status.success(), "{json:?}");
+    let value: serde_json::Value =
+        serde_json::from_slice(&json.stdout).expect("machine output must be JSON");
+    assert!(
+        value["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("WRK-")),
+        "{value}"
+    );
+}
+
+#[test]
+fn work_create_rejects_invalid_and_ambiguous_task_mappings_without_creating_work() {
+    let temporary = initialize_repository();
+    let goal_a = created_id(
+        &belay()
+            .args([
+                "add",
+                "goal",
+                "--title",
+                "First goal",
+                "--body",
+                TRACEABLE_GOAL,
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add first goal"),
+    );
+    let goal_b = created_id(
+        &belay()
+            .args([
+                "add",
+                "goal",
+                "--title",
+                "Second goal",
+                "--body",
+                TRACEABLE_GOAL,
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add second goal"),
+    );
+    let plan_body = concat!(
+        "## Delivery Map\n\n",
+        "| ID | Goal item | Outcome / Task | State |\n",
+        "| --- | --- | --- | --- |\n",
+        "| T-001 | SC-001 | Do the thing | not-started |\n\n",
+        "## T-001\n\n",
+        "- **Objective**: do it.\n",
+        "- **Scope**: in — one file. Out — everything else.\n",
+        "- **Steps**: do it.\n",
+        "- **Acceptance**: it works.\n",
+        "- **Verification**: test it.\n",
+    );
+    let plan = add_plan(&temporary, "Ambiguous plan", plan_body);
+    for goal in [&goal_a, &goal_b] {
+        let link = belay()
+            .args(["link", &plan, goal, "--relation", "fulfills"])
+            .current_dir(temporary.path())
+            .output()
+            .expect("link ambiguous plan");
+        assert!(link.status.success(), "{link:?}");
+    }
+
+    let invalid_task = format!("{plan}#t-999");
+    let invalid = belay()
+        .args([
+            "work",
+            "create",
+            "--task",
+            &invalid_task,
+            "--title",
+            "Invalid task",
+            "--body",
+            "Body",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("reject missing task");
+    assert_eq!(invalid.status.code(), Some(4), "{invalid:?}");
+
+    let task = format!("{plan}#t-001");
+    let ambiguous = belay()
+        .args([
+            "work",
+            "create",
+            "--task",
+            &task,
+            "--title",
+            "Ambiguous task",
+            "--body",
+            "Body",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("reject ambiguous task mapping");
+    assert_eq!(ambiguous.status.code(), Some(4), "{ambiguous:?}");
+
+    let connection =
+        Connection::open(temporary.path().join(".belay/state/belay.sqlite")).expect("open DB");
+    let work_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM entries WHERE type = 'work'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count rejected Work entries");
+    assert_eq!(work_count, 0);
+    assert_eq!(
+        fs::read_dir(temporary.path().join(".belay/entries/work"))
+            .expect("read Work mirrors")
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn work_create_uses_fully_qualified_goal_item_for_multi_goal_plan() {
+    let temporary = initialize_repository();
+    let goal_a = created_id(
+        &belay()
+            .args([
+                "add",
+                "goal",
+                "--title",
+                "First qualified goal",
+                "--body",
+                TRACEABLE_GOAL,
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add first qualified goal"),
+    );
+    let goal_b = created_id(
+        &belay()
+            .args([
+                "add",
+                "goal",
+                "--title",
+                "Second qualified goal",
+                "--body",
+                TRACEABLE_GOAL_TWO,
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add second qualified goal"),
+    );
+    let plan_body = format!(
+        "## Delivery Map\n\n\
+         | ID | Goal item | Outcome / Task | State |\n\
+         | --- | --- | --- | --- |\n\
+         | T-001 | {goal_a}#sc-001 | Do the thing | not-started |\n\n\
+         ## T-001\n\n\
+         - **Objective**: do it.\n\
+         - **Scope**: in — one file. Out — everything else.\n\
+         - **Steps**: do it.\n\
+         - **Acceptance**: it works.\n\
+         - **Verification**: test it.\n"
+    );
+    let short_plan_body = plan_body.replace(&format!("{goal_a}#sc-001"), "SC-001");
+    let short_plan = add_plan(&temporary, "Short multi-goal plan", &short_plan_body);
+    for goal in [&goal_a, &goal_b] {
+        let link = belay()
+            .args([
+                "link",
+                &short_plan,
+                &format!("{goal}#sc-00{}", if goal == &goal_a { 1 } else { 2 }),
+                "--relation",
+                "fulfills",
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("link qualified plan");
+        assert!(link.status.success(), "{link:?}");
+    }
+
+    let short_task = format!("{short_plan}#t-001");
+    let short_goal = belay()
+        .args([
+            "work",
+            "create",
+            "--task",
+            &short_task,
+            "--title",
+            "Reject short multi-goal mapping",
+            "--body",
+            "Implementation body",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("reject short multi-goal mapping");
+    assert_eq!(short_goal.status.code(), Some(4), "{short_goal:?}");
+
+    let plan = add_plan(&temporary, "Qualified plan", &plan_body);
+    for goal in [&goal_a, &goal_b] {
+        let link = belay()
+            .args([
+                "link",
+                &plan,
+                &format!("{goal}#sc-00{}", if goal == &goal_a { 1 } else { 2 }),
+                "--relation",
+                "fulfills",
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("link qualified plan");
+        assert!(link.status.success(), "{link:?}");
+    }
+
+    let task = format!("{plan}#t-001");
+    let created = belay()
+        .args([
+            "work",
+            "create",
+            "--task",
+            &task,
+            "--title",
+            "Implement qualified task",
+            "--body",
+            "Implementation body",
+            "--format",
+            "id",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("create qualified work");
+    assert!(created.status.success(), "{created:?}");
+    let work = String::from_utf8(created.stdout)
+        .expect("qualified Work ID is UTF-8")
+        .trim()
+        .to_owned();
+
+    let shown = belay()
+        .args(["show", &work])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show qualified work");
+    assert!(shown.status.success(), "{shown:?}");
+    let shown = String::from_utf8(shown.stdout).expect("qualified show stdout");
+    assert!(
+        shown.contains(&format!("- fulfills {goal_a}#sc-001")),
+        "{shown}"
+    );
+    assert!(
+        !shown.contains(&format!("- fulfills {goal_b}#sc-001")),
+        "{shown}"
     );
 }
 

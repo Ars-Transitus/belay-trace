@@ -97,6 +97,29 @@ Difficulty や Owner などを追加してよく、`belay plan lint` は belay �
 | Review | Entry ID | 対象への `reviews`、指摘が支える対象への `supports` |
 | Evidence | Evidence ID | 検証対象への `verifies` または `refutes` |
 
+### Work の Task 起点作成
+
+Plan Task に対応する実装 Work は、次の一体型コマンドで作成できる。
+
+```sh
+belay work create \
+  --task PLN-20260723T120100-001-deliver-safe-sync#t-001 \
+  --title "Implement safe sync" \
+  --body "Implementation details." \
+  --format id
+```
+
+`--task` は完全修飾された `PLN-...#t-nnn` で指定する。Belay は Delivery
+Map の `Goal item` と Plan の `fulfills` リンクから Goal criterion を導出し、
+Work に `implements Plan#task` と `fulfills Goal#sc-nnn` の両方を保存する。
+Plan が複数 Goal を扱う場合、`Goal item` は完全修飾された
+`GOAL-...#sc-nnn` でなければならない。Task または Goal の解決が欠ける、
+無効、非 canonical、または曖昧な場合は Work を作成しない。
+
+`--format id` は Work ID だけを、`--format json` は
+`{ "id": "WRK-..." }` だけを標準出力へ出す。これにより、人間向けの
+`Created WRK-...` をシェルで解析する必要がない。
+
 Entry の関係は frontmatter の `links` に、Evidence の関係は append-only record の
 `links` に保存する。本文に完全修飾 ID を書くことは可読性のために推奨するが、
 本文の文字列だけを provenance graph の edge とはみなさない。
