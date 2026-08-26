@@ -82,9 +82,11 @@ belay add decision \
   --title "Use SQLite for operational state" \
   --body "Keep local retrieval fast and rebuild from tracked Markdown."
 
-belay add work \
+belay work create \
+  --task PLN-20260607T090500-001-deliver-repository-sync#t-001 \
   --title "Implement repository sync" \
-  --body-file ./work-notes.md
+  --body-file ./work-notes.md \
+  --format id
 
 printf '%s\n' "Review findings" | \
   belay add review --title "Sync implementation review" --stdin
@@ -93,7 +95,13 @@ printf '%s\n' "Review findings" | \
 Goal entries can omit a body source; belay writes the required Goal sections as
 an editable template. Other entry types require `--body`, `--body-file`, or
 `--stdin`. Entry types are `goal`, `plan`, `decision`, `work`, `review`, and
-`note`. Commands print the generated display ID, for example:
+`note`. For implementation Work, prefer `belay work create --task`: it reads
+the Plan Delivery Map's Goal item and creates the Work with both `implements`
+and `fulfills` links in one mutation. Use `--format id` or `--format json` when
+capturing the result from a script or agent. Generic `belay add work` remains
+available for manually staged entries.
+
+Human-readable commands print the generated display ID, for example:
 
 ```text
 GOAL-20260607T085900-001-reliable-repository-sync

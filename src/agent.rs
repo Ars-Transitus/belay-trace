@@ -59,6 +59,7 @@ belay show <plan-id>#t-001                                    # one task; prefer
 belay show <goal-id>#sc-001                                   # one Success Criterion
 belay archive candidates                                      # deterministic stale-history candidates
 belay add <goal|plan|decision|work|review|note> --title "<short-en-slug>"
+belay work create --task <plan-id>#t-001 --title "..." --body "..."
 belay link <from-id> <to-id> --relation <rel>
     # rel: fulfills | supports | verifies | reviews | implements |
     #      references | supersedes | follows-up | refutes
@@ -281,7 +282,7 @@ Use a fresh context that did not implement the change to review the Intent Brief
 
 ## Update trace
 
-1. Use `belay add goal` for intent, then link Work/Decision entries to it with `fulfills`. Run `belay goal lint <goal-id>` after drafting or materially editing a Goal.
+1. Use `belay add goal` for intent, then use `belay work create --task <plan-id>#t-001` for implementation Work so the Goal criterion and required links are derived atomically. Use `belay link` for additional relationships and link Decision entries to intent with `fulfills`. Run `belay goal lint <goal-id>` after drafting or materially editing a Goal.
 2. Record validation with `belay verify record` and inspect `belay coverage` before release decisions.
 3. Run `belay sync` after direct managed Markdown edits. Use terminal statuses (`abandoned`, `rejected`, `superseded`, `archived`) instead of deleting trace history. `archived` hides an entry from default search and compile; it is not a substitute for `completed`.
 4. Entry-body templates are embedded above, so authoring an unfamiliar entry

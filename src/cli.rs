@@ -24,7 +24,7 @@ use crate::route;
 use crate::search::{self, SearchRequest};
 use crate::store::{self, MutationOutcome};
 
-const TOP_LEVEL_ABOUT: &str = "Preserve goals, plans, decisions, work, reviews, and evidence in a local SQLite store with a tracked Markdown review surface.\n\nWorkflow groups:\n  Setup: init and doctor\n  Capture: add, link, status, and show\n  Assurance: goal, verify, and coverage\n  Reconcile: sync and rebuild\n  Retrieve: search, context, and export\n\nThe core workflow is: initialize a repository, add and link trace entries, synchronize direct Markdown edits, then retrieve focused context with search and context commands. Archived entries stay in history and drop out of default search and compile.";
+const TOP_LEVEL_ABOUT: &str = "Preserve goals, plans, decisions, work, reviews, and evidence in a local SQLite store with a tracked Markdown review surface.\n\nWorkflow groups:\n  Setup: init and doctor\n  Capture: add, work create, link, status, and show\n  Assurance: goal, verify, and coverage\n  Reconcile: sync and rebuild\n  Retrieve: search, context, and export\n\nThe core workflow is: initialize a repository, create trace-complete Work from Plan tasks, add and link other trace entries, synchronize direct Markdown edits, then retrieve focused context with search and context commands. Archived entries stay in history and drop out of default search and compile.";
 
 const TOP_LEVEL_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Project commands discover the current repository root and read .belay/config.toml.
@@ -35,6 +35,7 @@ Examples:
   belay init
   belay add decision --title "Use SQLite" --body "Keep operational state local."
   belay add goal --title "Reliable sync"
+  belay work create --task PLN-...#t-001 --title "Implement sync" --body "..."
   belay goal lint --all
   belay verify record --kind test --verdict pass --source "cargo test" --summary "all tests passed" --verifies GOAL-...
   belay search "sqlite migration"
@@ -83,6 +84,9 @@ const ADD_AFTER_HELP: &str = r#"Behavior and Side Effects:
   managed Markdown mirror, and records a sync baseline. Goal entries may omit a
   body source; belay then writes the required Goal sections as a template.
 
+  For a Work that belongs to a Plan task, prefer `belay work create`; it derives
+  the Goal criterion and creates the Work plus its required links together.
+
 Examples:
   belay add decision --title "Use SQLite" --body "Keep operational state local."
   belay add goal --title "Reliable sync"
@@ -95,7 +99,48 @@ Exit Status:
   6  Storage failure
 
 Related Commands:
-  `belay link`, `belay status`, `belay show`, and `belay sync`."#;
+  `belay work create`, `belay link`, `belay status`, `belay show`, and `belay sync`."#;
+
+const WORK_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  Work workflow commands enforce the trace relationship between a Plan task,
+  its Goal criterion, and the implementation Work.
+
+Examples:
+  belay work create --task PLN-20260606T120000-001-reliable-sync#t-001 \
+    --title "Implement sync" --body "Implementation details."
+
+Exit Status:
+  0  Work created
+  2  Invalid invocation or output format
+  3  Repository not initialized
+  4  Invalid task, mapping, title, or body validation
+  6  Storage failure
+
+Related Commands:
+  `belay add work`, `belay link`, `belay show`, and `belay coverage`."#;
+
+const WORK_CREATE_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  Resolves one canonical Plan task, derives its Goal criterion from the Plan's
+  Delivery Map and Goal link, then creates one Work with `implements` and
+  `fulfills` links in one SQLite mutation. Invalid or ambiguous mappings create
+  no Work. The normal output is human-readable; `--format id` prints only the
+  canonical Work ID and `--format json` prints a JSON object with `id`.
+
+Examples:
+  belay work create --task PLN-20260606T120000-001-reliable-sync#t-001 \
+    --title "Implement sync" --body "Implementation details."
+  belay work create --task PLN-20260606T120000-001-reliable-sync#t-001 \
+    --title "Implement sync" --body-file ./work.md --format id
+
+Exit Status:
+  0  Work created
+  2  Invalid invocation or output format
+  3  Repository not initialized
+  4  Invalid task, mapping, title, or body validation
+  6  Storage or filesystem failure
+
+Related Commands:
+  `belay add work`, `belay link`, `belay show`, and `belay doctor`."#;
 
 const LINK_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Adds a validated directional relationship between existing entries. Identical links
@@ -492,6 +537,12 @@ enum Command {
     Add(AddArgs),
 
     #[command(
+        about = "Create trace-complete Work entries",
+        after_help = WORK_AFTER_HELP
+    )]
+    Work(WorkArgs),
+
+    #[command(
         about = "Link two trace entries",
         after_help = LINK_AFTER_HELP
     )]
@@ -635,6 +686,54 @@ struct AddArgs {
     /// Read the Markdown body from standard input.
     #[arg(long, conflicts_with_all = ["body", "body_file"])]
     stdin: bool,
+}
+
+#[derive(Debug, Args)]
+struct WorkArgs {
+    #[command(subcommand)]
+    command: WorkCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum WorkCommand {
+    #[command(
+        about = "Create a Work from one Plan task",
+        after_help = WORK_CREATE_AFTER_HELP
+    )]
+    Create(WorkCreateArgs),
+}
+
+#[derive(Debug, Args)]
+#[command(group(
+    ArgGroup::new("body_source")
+        .required(false)
+        .multiple(false)
+        .args(["body", "body_file", "stdin"])
+))]
+struct WorkCreateArgs {
+    /// Canonical full Plan task reference, such as PLN-...#t-001.
+    #[arg(long, value_name = "PLAN#TASK")]
+    task: String,
+
+    /// Human-readable Work title.
+    #[arg(long)]
+    title: String,
+
+    /// Inline Markdown body.
+    #[arg(long, conflicts_with_all = ["body_file", "stdin"])]
+    body: Option<String>,
+
+    /// Read the Markdown body from this path.
+    #[arg(long, value_name = "PATH", conflicts_with_all = ["body", "stdin"])]
+    body_file: Option<PathBuf>,
+
+    /// Read the Markdown body from standard input.
+    #[arg(long, conflicts_with_all = ["body", "body_file"])]
+    stdin: bool,
+
+    /// Output format: human, id, or json.
+    #[arg(long, value_enum, default_value_t = WorkCreateFormat::Human)]
+    format: WorkCreateFormat,
 }
 
 #[derive(Debug, Args)]
@@ -1005,6 +1104,13 @@ struct ExportArgs {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+enum WorkCreateFormat {
+    Human,
+    Id,
+    Json,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum CliExportFormat {
     Markdown,
     Json,
@@ -1078,6 +1184,31 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
             println!("Created {}", entry.display_id);
             Ok(())
         }
+        Command::Work(arguments) => match arguments.command {
+            WorkCommand::Create(arguments) => {
+                let repository = repository::discover(current_dir)?;
+                let body = read_body_sources(
+                    arguments.body.as_ref(),
+                    arguments.body_file.as_deref(),
+                    arguments.stdin,
+                    EntryType::Work,
+                )?;
+                let entry = store::create_work_for_task(
+                    &repository,
+                    &arguments.task,
+                    arguments.title,
+                    body,
+                )?;
+                match arguments.format {
+                    WorkCreateFormat::Human => println!("Created {}", entry.display_id),
+                    WorkCreateFormat::Id => println!("{}", entry.display_id),
+                    WorkCreateFormat::Json => {
+                        println!("{}", serde_json::json!({ "id": entry.display_id }))
+                    }
+                }
+                Ok(())
+            }
+        },
         Command::Link(arguments) => {
             let repository = repository::discover(current_dir)?;
             let relation = LinkRelation::from_str(&arguments.relation)?;
@@ -1629,14 +1760,28 @@ fn print_search_results(request: &SearchRequest, results: &[search::SearchResult
 }
 
 fn read_body(arguments: &AddArgs, entry_type: EntryType) -> Result<String, BelayError> {
-    if let Some(body) = &arguments.body {
+    read_body_sources(
+        arguments.body.as_ref(),
+        arguments.body_file.as_deref(),
+        arguments.stdin,
+        entry_type,
+    )
+}
+
+fn read_body_sources(
+    body: Option<&String>,
+    body_file: Option<&Path>,
+    stdin: bool,
+    entry_type: EntryType,
+) -> Result<String, BelayError> {
+    if let Some(body) = body {
         return Ok(body.clone());
     }
-    if let Some(path) = &arguments.body_file {
+    if let Some(path) = body_file {
         return fs::read_to_string(path)
             .map_err(|source| BelayError::io("read body file", path, source));
     }
-    if arguments.stdin {
+    if stdin {
         let mut body = String::new();
         io::stdin()
             .read_to_string(&mut body)
