@@ -5,8 +5,8 @@ type: plan
 title: atomic-work-creation
 status: draft
 created_at: 2026-08-26T21:34:47+09:00
-updated_at: 2026-08-26T21:57:48+09:00
-revision: 6
+updated_at: 2026-08-26T22:48:08+09:00
+revision: 7
 tags: []
 links:
 - relation: fulfills
