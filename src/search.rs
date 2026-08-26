@@ -220,17 +220,10 @@ pub fn apply_default_archived_exclude(
     exclude: &mut Vec<EntryStatus>,
     include_archived: bool,
 ) {
-    if include_archived
-        || include
-            .iter()
-            .any(|status| *status == EntryStatus::Archived)
-    {
+    if include_archived || include.contains(&EntryStatus::Archived) {
         return;
     }
-    if !exclude
-        .iter()
-        .any(|status| *status == EntryStatus::Archived)
-    {
+    if !exclude.contains(&EntryStatus::Archived) {
         exclude.push(EntryStatus::Archived);
     }
 }
