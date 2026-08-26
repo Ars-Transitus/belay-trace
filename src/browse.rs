@@ -577,9 +577,11 @@ impl BrowseState {
         for item in &self.snapshot.diagnostics {
             diagnostic_items.push_str(&format!("<li>{}</li>", escape(item)));
         }
-        let diagnostic_details = (!diagnostic_items.is_empty())
-            .then(|| format!("<h3>Diagnostics</h3><ul>{diagnostic_items}</ul>"))
-            .unwrap_or_default();
+        let diagnostic_details = if diagnostic_items.is_empty() {
+            String::new()
+        } else {
+            format!("<h3>Diagnostics</h3><ul>{diagnostic_items}</ul>")
+        };
         let reload_result = if self.last_reload_result.starts_with("Reload has not run") {
             ""
         } else {
