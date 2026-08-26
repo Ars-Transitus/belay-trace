@@ -1,4 +1,0 @@
-interface:
-  display_name: "Safe Autonomy Core"
-  short_description: "Shared workspace-boundary autonomy policy"
-  default_prompt: "Apply the shared safety policy and belay workflow to this long-running task."
