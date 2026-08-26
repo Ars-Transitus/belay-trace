@@ -127,6 +127,10 @@ belay route apply <run-id> --approve <exact-preview-hash>
   Delivery Map row and its `## T-003` section; `belay show <plan-id>` returns
   every task in the Plan. On a ten-task Plan that is roughly an eighth of the
   output.
+  `--focus` resolves exactly one Goal item from the task row. Each row must
+  name a single `SC-NNN` or `GOAL-...#sc-nnn`; comma-separated Goal items, or a
+  Plan linked to multiple Goals without fully qualified Goal items, make focus
+  compile fail.
   Cheap retrieval is not licence to skip the Intent Brief: a task read alone
   loses the Constraints and Non-goals that make it correct, so read those too
   before acting, and read the whole entry when the work spans tasks.
@@ -183,7 +187,8 @@ sections that carry information; do not add empty placeholder sections.
 ## Delivery Map
 | ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | SC-001 | <task> | <actor> | not-started | <evidence> |
+| T-001 | SC-001 | <outcome for SC-001> | <actor> | not-started | <evidence> |
+| T-002 | SC-002 | <outcome for SC-002> | <actor> | not-started | <evidence> |
 
 ## T-001
 - Objective: <objective>
@@ -191,7 +196,18 @@ sections that carry information; do not add empty placeholder sections.
 - Steps: <steps>
 - Acceptance: <acceptance condition>
 - Verification: <command or evidence>
+
+## T-002
+- Objective: <objective>
+- Scope: <scope>
+- Steps: <steps>
+- Acceptance: <acceptance condition>
+- Verification: <command or evidence>
 ```
+
+One task, one Goal item: each Delivery Map row maps to exactly one Success
+Criterion. Add separate tasks for additional criteria; do not write
+`SC-001, SC-002` in one row.
 
 For `decision`, `work`, `review`, and `note`, use a short factual summary
 followed by typed labels as needed: `Fact`, `Human decision`, `Assumption`,
@@ -215,12 +231,14 @@ followed by typed labels as needed: `Fact`, `Human decision`, `Assumption`,
 ## Map
 
 1. Give each Goal Success Criterion a stable, document-local ID using `SC-NNN`, starting at `SC-001`. Never renumber or reuse an ID.
-2. Add a Delivery Map to the Plan with columns: ID, Goal item, Outcome / Task, Actor, State, and Verification / Evidence.
-3. Map every Success Criterion to an observable outcome task and a verification task. Explain any task that has no Goal item.
-4. Give tasks stable, document-local IDs using `T-NNN`, starting at `T-001`. Never renumber or reuse an ID. Outside the defining document, use fully qualified references such as `GOAL-...#sc-001` and `PLN-...#t-001`.
-5. Task states are limited to `not-started`, `in-progress`, `blocked`, `implemented`, `verified`, and `dropped`. `implemented` means the change exists; `verified` requires fresh passing Evidence that actually checks the mapped outcome. A test definition is not passing Evidence.
-6. Keep dropped tasks visible and record the reason and approval source.
-7. Give every task a `## T-NNN` body section in the same Plan. The row is the index and the state; the section is what a reader with no prior context acts on, and it is what `belay show <plan-id>#t-nnn` returns. Carry at least Objective, Scope, Steps, Acceptance, and Verification; add whatever else your workflow needs, since `belay plan lint` ignores fields it does not require. Run `belay plan lint <plan-id>` after drafting or materially editing a Plan.
+2. Link each Plan to exactly one Goal (`fulfills` or `implements`). If work spans multiple Goals, use separate Plans rather than multiple Goal links on one Plan.
+3. Add a Delivery Map to the Plan with columns: ID, Goal item, Outcome / Task, Actor, State, and Verification / Evidence.
+4. One task, one Goal item. Each row's Goal item column names exactly one Success Criterion — `SC-NNN` when the Plan has a single Goal link, or a fully qualified `GOAL-...#sc-nnn` when it does not. Never list multiple Goal items in one row; comma-separated values such as `SC-001, SC-002` break `belay context compile --focus` and fragment-scoped `belay show`. Cover each criterion with its own task; mention additional criteria only in Acceptance or Verification.
+5. Map every Success Criterion to at least one task. Explain any task that has no Goal item.
+6. Give tasks stable, document-local IDs using `T-NNN`, starting at `T-001`. Never renumber or reuse an ID. Outside the defining document, use fully qualified references such as `GOAL-...#sc-001` and `PLN-...#t-001`.
+7. Task states are limited to `not-started`, `in-progress`, `blocked`, `implemented`, `verified`, and `dropped`. `implemented` means the change exists; `verified` requires fresh passing Evidence that actually checks the mapped outcome. A test definition is not passing Evidence.
+8. Keep dropped tasks visible and record the reason and approval source.
+9. Give every task a `## T-NNN` body section in the same Plan. The row is the index and the state; the section is what a reader with no prior context acts on, and it is what `belay show <plan-id>#t-nnn` returns. Carry at least Objective, Scope, Steps, Acceptance, and Verification; add whatever else your workflow needs, since `belay plan lint` ignores fields it does not require. Run `belay plan lint <plan-id>` after drafting or materially editing a Plan.
 
 ## Execute
 
