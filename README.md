@@ -159,6 +159,10 @@ Generate bounded, source-attributed context for humans or agents:
 belay context "implement repository sync" --format human --budget 2500
 belay context "implement repository sync" --format agent --budget 2500
 belay context compile "implement repository sync" --budget 4000
+belay context compile --format agent --budget 4000
+belay context compile --focus PLN-20260607T090500-001-deliver-sync#t-001
+belay archive candidates
+belay search --include-archived
 ```
 
 Context selection follows BM25 relevance, then linked entries in deterministic
@@ -166,7 +170,10 @@ order. Agent output admits a budget-scaled set of candidates, keeps at least one
 Markdown evidence unit for included entries, and weights remaining space toward
 higher-ranked entries while preserving the 90 percent selection limit. The
 `compile` form adds Goal, constraints, non-goals, Evidence, and past-failure
-sections before the ranked context.
+sections before the ranked context. Omit the task to compile the live working
+set. `--focus PLN-...#t-001` emits a task packet. Archived entries are omitted
+unless `--include-archived` is passed. Display IDs may be a unique prefix or
+slug.
 
 Context uses direct links and a deterministic token estimate. Embeddings are not
 required for the v1 workflow.

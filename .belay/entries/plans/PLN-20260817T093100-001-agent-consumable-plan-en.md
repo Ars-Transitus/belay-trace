@@ -5,7 +5,7 @@ type: plan
 title: agent-consumable-plan-entries
 status: approved
 created_at: 2026-08-17T09:31:00+09:00
-updated_at: 2026-08-17T18:48:29+09:00
+updated_at: 2026-08-18T20:38:50+09:00
 revision: 1
 tags: []
 links:

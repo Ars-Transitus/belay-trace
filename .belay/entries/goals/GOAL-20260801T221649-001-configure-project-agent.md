@@ -5,8 +5,8 @@ type: goal
 title: configure-project-agent-models
 status: draft
 created_at: 2026-08-01T22:16:49+09:00
-updated_at: 2026-08-01T22:23:22+09:00
-revision: 2
+updated_at: 2026-08-18T20:38:50+09:00
+revision: 1
 tags: []
 links: []
 metadata: {}

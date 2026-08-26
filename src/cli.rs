@@ -8,6 +8,7 @@ use std::str::FromStr;
 use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
 use crate::agent;
+use crate::archive;
 use crate::browse::{self, BrowseOptions};
 use crate::context;
 use crate::coverage;
@@ -23,7 +24,7 @@ use crate::route;
 use crate::search::{self, SearchRequest};
 use crate::store::{self, MutationOutcome};
 
-const TOP_LEVEL_ABOUT: &str = "Preserve goals, plans, decisions, work, reviews, and evidence in a local SQLite store with a tracked Markdown review surface.\n\nWorkflow groups:\n  Setup: init and doctor\n  Capture: add, link, status, and show\n  Assurance: goal, verify, and coverage\n  Reconcile: sync and rebuild\n  Retrieve: search, context, and export\n\nThe core workflow is: initialize a repository, add and link trace entries, synchronize direct Markdown edits, then retrieve focused context with search and context commands.";
+const TOP_LEVEL_ABOUT: &str = "Preserve goals, plans, decisions, work, reviews, and evidence in a local SQLite store with a tracked Markdown review surface.\n\nWorkflow groups:\n  Setup: init and doctor\n  Capture: add, link, status, and show\n  Assurance: goal, verify, and coverage\n  Reconcile: sync and rebuild\n  Retrieve: search, context, and export\n\nThe core workflow is: initialize a repository, add and link trace entries, synchronize direct Markdown edits, then retrieve focused context with search and context commands. Archived entries stay in history and drop out of default search and compile.";
 
 const TOP_LEVEL_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Project commands discover the current repository root and read .belay/config.toml.
@@ -144,12 +145,15 @@ const SHOW_AFTER_HELP: &str = r#"Behavior and Side Effects:
   and the body section headed with its ID. Use it to read one Success Criterion
   or one Delivery Map task without paying for the whole entry. A fragment that
   is not canonical, not present, or ambiguous fails rather than falling back to
-  the complete entry.
+  the complete entry. Display IDs may be a unique prefix or slug; 0 or 2+ matches
+  fail with the candidate list.
 
-Examples:
+  Examples:
   belay show DEC-20260606T115000-001-sqlite
   belay show PLN-20260723T120100-001-deliver-safe-sync#t-001
   belay show GOAL-20260723T120000-001-safe-sync#sc-001
+  belay show retrieval-hygiene-archive
+  belay show PLN-20260723#t-001
 
 Exit Status:
   0  Entry displayed
@@ -165,12 +169,16 @@ const SEARCH_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Performs exact display-ID lookup, structured filtering, or deduplicated
   FTS5/BM25-ranked keyword retrieval. Search does not mutate repository state.
   Plain query words are escaped as FTS terms; multiple words match with OR.
+  Archived entries are omitted unless `--include-archived` or `--status archived`
+  is passed.
 
 Examples:
   belay search "sqlite migration"
   belay search --type decision --status accepted
   belay search --status draft --status active
   belay search --exclude-status completed --exclude-status abandoned
+  belay search --include-archived
+  belay search --id DEC-20260606T115000-001-sqlite
   belay search --id DEC-20260606T115000-001-sqlite
 
 Exit Status:
@@ -193,20 +201,43 @@ const CONTEXT_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Token estimates use ceil(ASCII UTF-8 bytes / 4) plus non-ASCII scalar count.
   The default budget is 2500; budgets below 64 are rejected.
   This command does not mutate repository state.
+  Archived entries are omitted unless `--include-archived` is passed.
+  With no task, compile emits the live working set and a Next index.
+  `--focus PLN-...#t-001` emits a task packet instead of ranked history.
 
 Examples:
   belay context "implement repository sync" --format agent --budget 2500
   belay context compile "implement repository sync" --budget 4000
+  belay context compile --format agent --budget 4000
+  belay context compile --focus PLN-20260723T120100-001-deliver-safe-sync#t-001
 
 Exit Status:
   0  Context generated
   2  Invalid invocation
   3  Repository not initialized
-  4  Empty task or budget validation error
+  4  Invalid focus, budget, or repository state
   6  Storage failure
 
 Related Commands:
   `belay search` and `belay show`."#;
+
+const ARCHIVE_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  Lists deterministic archive candidates without changing status. Candidates are
+  entries already in a terminal status, the old side of a supersedes link, or
+  both. Semantic judgment and `belay status <id> archived` stay with the caller.
+  This command does not mutate repository state.
+
+Examples:
+  belay archive candidates
+
+Exit Status:
+  0  Candidates listed, including none
+  2  Invalid invocation
+  3  Repository not initialized
+  6  Storage failure
+
+Related Commands:
+  `belay status`, `belay search --include-archived`, and `belay context`."#;
 
 const GOAL_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Reviews Goal entries without calling an LLM. Lint performs deterministic checks;
@@ -497,6 +528,12 @@ enum Command {
     Context(ContextArgs),
 
     #[command(
+        about = "List deterministic archive candidates",
+        after_help = ARCHIVE_AFTER_HELP
+    )]
+    Archive(ArchiveArgs),
+
+    #[command(
         about = "Prepare and safely materialize a Route decision run",
         after_help = ROUTE_AFTER_HELP
     )]
@@ -630,7 +667,7 @@ struct EntryIdArgs {
 
 #[derive(Debug, Args)]
 struct ShowArgs {
-    /// Entry display ID, optionally with a canonical `#sc-NNN` or `#t-NNN` fragment.
+    /// Entry display ID, unique prefix, or slug, optionally with `#sc-NNN` or `#t-NNN`.
     id: String,
 }
 
@@ -650,6 +687,10 @@ struct SearchArgs {
     /// Exclude entries with this status. Repeatable.
     #[arg(long = "exclude-status", value_name = "STATUS")]
     exclude_status: Vec<String>,
+
+    /// Include archived entries in results. `--status archived` also includes them.
+    #[arg(long)]
+    include_archived: bool,
 
     /// Filter by an exact tag.
     #[arg(long)]
@@ -683,8 +724,9 @@ enum CliContextFormat {
 
 #[derive(Debug, Args)]
 struct ContextArgs {
-    /// Task to retrieve context for. Use `compile <task>` for the Phase 5 compiler.
-    #[arg(num_args = 1..=2)]
+    /// Task to retrieve context for. Omit for the live working set. Use
+    /// `compile <task>` for the Phase 5 compiler.
+    #[arg(num_args = 0..=2)]
     task: Vec<String>,
 
     /// Output format for a human or an AI agent.
@@ -695,9 +737,29 @@ struct ContextArgs {
     #[arg(long, default_value_t = 2500)]
     budget: usize,
 
-    /// Explicit seed entry for context compile.
+    /// Explicit seed entry for context compile. Unique prefix or slug is allowed.
     #[arg(long = "seed")]
     seeds: Vec<String>,
+
+    /// Compile a task packet for one `#t-nnn` or `#sc-nnn` fragment.
+    #[arg(long)]
+    focus: Option<String>,
+
+    /// Include archived entries in ranked context and compile sections.
+    #[arg(long)]
+    include_archived: bool,
+}
+
+#[derive(Debug, Args)]
+struct ArchiveArgs {
+    #[command(subcommand)]
+    command: ArchiveCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum ArchiveCommand {
+    #[command(about = "List deterministic archive candidates without changing status")]
+    Candidates,
 }
 
 #[derive(Debug, Args)]
@@ -1063,18 +1125,27 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
                 .into_iter()
                 .map(|value| EntryStatus::from_str(&value))
                 .collect::<Result<Vec<_>, _>>()?;
-            let status_exclude = arguments
+            let mut status_exclude = arguments
                 .exclude_status
                 .into_iter()
                 .map(|value| EntryStatus::from_str(&value))
                 .collect::<Result<Vec<_>, _>>()?;
+            let display_id = match arguments.id {
+                Some(id) => Some(store::resolve_reference(&repository, &id)?.display_id),
+                None => None,
+            };
+            search::apply_default_archived_exclude(
+                &status_include,
+                &mut status_exclude,
+                arguments.include_archived,
+            );
             let request = SearchRequest {
                 query: arguments.query.unwrap_or_default(),
                 entry_type,
                 status_include,
                 status_exclude,
                 tag: arguments.tag,
-                display_id: arguments.id,
+                display_id,
                 limit: arguments.limit,
             };
             let results = search::search(&repository, &request)?;
@@ -1098,19 +1169,45 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
                 CliContextFormat::Agent => context::ContextFormat::Agent,
             };
             let (compile, task) = parse_context_task(&arguments.task)?;
-            let bundle = if compile {
+            let bundle = if let Some(focus) = arguments.focus.as_deref() {
+                context::compile_focus(&repository, focus, format, arguments.budget)?
+            } else if compile {
                 context::compile(
                     &repository,
                     task,
                     format,
                     arguments.budget,
                     &arguments.seeds,
+                    arguments.include_archived,
+                )?
+            } else if task.is_empty() {
+                context::compile_working_set(
+                    &repository,
+                    format,
+                    arguments.budget,
+                    arguments.include_archived,
                 )?
             } else {
-                context::generate(&repository, task, format, arguments.budget)?
+                context::generate(
+                    &repository,
+                    task,
+                    format,
+                    arguments.budget,
+                    arguments.include_archived,
+                )?
             };
             print!("{}", bundle.text);
             Ok(())
+        }
+        Command::Archive(arguments) => {
+            let repository = repository::discover(current_dir)?;
+            match arguments.command {
+                ArchiveCommand::Candidates => {
+                    let candidates = archive::candidates(&repository)?;
+                    print!("{}", archive::render_candidates(&candidates));
+                    Ok(())
+                }
+            }
         }
         Command::Route(arguments) => {
             let repository = repository::discover(current_dir)?;
@@ -1556,9 +1653,8 @@ fn read_body(arguments: &AddArgs, entry_type: EntryType) -> Result<String, Belay
 
 fn parse_context_task(values: &[String]) -> Result<(bool, &str), BelayError> {
     match values {
-        [command] if command == "compile" => Err(BelayError::Validation {
-            message: "context compile requires a task".to_owned(),
-        }),
+        [] => Ok((true, "")),
+        [command] if command == "compile" => Ok((true, "")),
         [task] => Ok((false, task.as_str())),
         [command, task] if command == "compile" => Ok((true, task.as_str())),
         [command, _] => Err(BelayError::Validation {

@@ -5,7 +5,7 @@ type: review
 title: Review PR rust CI fix
 status: completed
 created_at: 2026-07-30T18:15:59+09:00
-updated_at: 2026-08-17T18:48:29+09:00
+updated_at: 2026-08-18T20:38:50+09:00
 revision: 1
 tags: []
 links:

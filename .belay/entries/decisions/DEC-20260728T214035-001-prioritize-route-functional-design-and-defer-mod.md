@@ -5,7 +5,7 @@ type: decision
 title: Prioritize Route functional design and defer model-evolution value evaluation
 status: accepted
 created_at: 2026-07-28T21:40:35+09:00
-updated_at: 2026-08-17T18:48:29+09:00
+updated_at: 2026-08-18T20:38:50+09:00
 revision: 1
 tags: []
 links:

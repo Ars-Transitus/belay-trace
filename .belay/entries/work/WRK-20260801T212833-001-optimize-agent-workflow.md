@@ -5,8 +5,8 @@ type: work
 title: optimize-agent-workflow
 status: completed
 created_at: 2026-08-01T21:28:33+09:00
-updated_at: 2026-08-01T21:36:24+09:00
-revision: 6
+updated_at: 2026-08-18T20:38:50+09:00
+revision: 1
 tags: []
 links:
 - relation: fulfills

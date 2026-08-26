@@ -69,6 +69,7 @@ fn top_level_help_describes_commands_workflow_and_exit_categories() {
         "search",
         "browse",
         "context",
+        "archive",
         "route",
         "doctor",
         "rebuild",
@@ -81,8 +82,8 @@ fn top_level_help_describes_commands_workflow_and_exit_categories() {
 #[test]
 fn every_command_help_has_the_required_structure() {
     for command in [
-        "init", "add", "link", "status", "show", "search", "browse", "context", "route", "sync",
-        "rebuild", "export", "doctor",
+        "init", "add", "link", "status", "show", "search", "browse", "context", "archive", "route",
+        "sync", "rebuild", "export", "doctor",
     ] {
         let output = belay()
             .args([command, "--help"])
@@ -4807,4 +4808,280 @@ fn route_rejects_a_symlinked_state_root_without_external_write() {
             .count(),
         0
     );
+}
+
+#[test]
+fn show_and_status_resolve_unique_prefix_and_slug() {
+    let temporary = initialize_repository();
+    let id = created_id(
+        &belay()
+            .args([
+                "add",
+                "decision",
+                "--title",
+                "Unique prefix slug",
+                "--body",
+                "Keep IDs short to resolve.",
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add decision"),
+    );
+    let parts = belay_trace::entry::parse_display_id(&id).expect("parse id");
+    let prefix = format!("DEC-{}", &parts.timestamp[..8]);
+    let shown = belay()
+        .args(["show", &prefix])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show prefix");
+    assert!(shown.status.success(), "{shown:?}");
+    let stdout = String::from_utf8(shown.stdout).expect("stdout");
+    assert!(stdout.contains(&format!("ID: {id}")), "{stdout}");
+
+    let by_slug = belay()
+        .args(["show", &parts.slug])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show slug");
+    assert!(by_slug.status.success(), "{by_slug:?}");
+
+    let accepted = belay()
+        .args(["status", &parts.slug, "accepted"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("status by slug");
+    assert!(accepted.status.success(), "{accepted:?}");
+}
+
+#[test]
+fn show_rejects_an_ambiguous_slug() {
+    let temporary = initialize_repository();
+    created_id(
+        &belay()
+            .args(["add", "note", "--title", "Shared stem one", "--body", "A"])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add first"),
+    );
+    created_id(
+        &belay()
+            .args(["add", "note", "--title", "Shared stem two", "--body", "B"])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add second"),
+    );
+    let output = belay()
+        .args(["show", "shared-stem"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("ambiguous slug");
+    assert_eq!(output.status.code(), Some(4), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("stderr");
+    assert!(stderr.contains("ambiguous"), "{stderr}");
+}
+
+#[test]
+fn archived_entries_are_hidden_from_default_search_and_visible_with_opt_in() {
+    let temporary = initialize_repository();
+    let note = created_id(
+        &belay()
+            .args([
+                "add",
+                "note",
+                "--title",
+                "Hide me later",
+                "--body",
+                "note body",
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add note"),
+    );
+    let archived = belay()
+        .args(["status", &note, "archived"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("archive note");
+    assert!(archived.status.success(), "{archived:?}");
+
+    let hidden = belay()
+        .args(["search", "Hide"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("search default");
+    assert!(hidden.status.success(), "{hidden:?}");
+    let stdout = String::from_utf8(hidden.stdout).expect("stdout");
+    assert!(!stdout.contains(&note), "{stdout}");
+
+    let included = belay()
+        .args(["search", "Hide", "--include-archived"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("search include archived");
+    let included = String::from_utf8(included.stdout).expect("stdout");
+    assert!(included.contains(&note), "{included}");
+
+    let shown = belay()
+        .args(["show", &note])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show archived");
+    assert!(shown.status.success(), "{shown:?}");
+}
+
+#[test]
+fn archive_candidates_lists_completed_unlinked_work() {
+    let temporary = initialize_repository();
+    let work = created_id(
+        &belay()
+            .args([
+                "add",
+                "work",
+                "--title",
+                "Finished isolated work",
+                "--body",
+                "done",
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add work"),
+    );
+    assert!(
+        belay()
+            .args(["status", &work, "completed"])
+            .current_dir(temporary.path())
+            .output()
+            .expect("complete work")
+            .status
+            .success()
+    );
+    let output = belay()
+        .args(["archive", "candidates"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("list candidates");
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("stdout");
+    assert!(stdout.contains(&work), "{stdout}");
+    assert!(stdout.contains("terminal-status"), "{stdout}");
+}
+
+#[test]
+fn context_without_a_task_emits_the_working_set_and_next_index() {
+    let temporary = initialize_repository();
+    let body = concat!(
+        "## Intent Brief\n\n",
+        "### Constraints\n- stay local\n\n",
+        "### Non-goals\n- no remote publish\n\n",
+        "### Assumptions\n- None identified\n\n",
+        "### Unknowns / Decisions Needed\n- None identified\n\n",
+        "## Delivery Map\n\n",
+        "| ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |\n",
+        "| --- | --- | --- | --- | --- | --- |\n",
+        "| T-001 | SC-001 | First live task | AI | not-started | pending |\n\n",
+        "## T-001\n\n",
+        "- **Objective**: retrieve the working set.\n",
+        "- **Scope**: in — compile. out — remote.\n",
+        "- **Steps**: run belay context compile.\n",
+        "- **Acceptance**: Next lists T-001.\n",
+        "- **Verification**: cargo test\n",
+    );
+    let plan = created_id(
+        &belay()
+            .args([
+                "add",
+                "plan",
+                "--title",
+                "Live working plan",
+                "--body",
+                body,
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add plan"),
+    );
+    let compiled = belay()
+        .args([
+            "context", "compile", "--format", "agent", "--budget", "4000",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("working set compile");
+    assert!(compiled.status.success(), "{compiled:?}");
+    let stdout = String::from_utf8(compiled.stdout).expect("stdout");
+    assert!(stdout.contains("# Working set"), "{stdout}");
+    assert!(stdout.contains(&format!("{plan}#t-001")), "{stdout}");
+    assert!(stdout.contains("First live task"), "{stdout}");
+}
+
+#[test]
+fn context_focus_prints_a_task_packet_without_sibling_tasks() {
+    let temporary = initialize_repository();
+    let body = concat!(
+        "## Intent Brief\n\n",
+        "### Constraints\n- stay local\n\n",
+        "### Non-goals\n- no sibling leak\n\n",
+        "### Assumptions\n- None identified\n\n",
+        "### Unknowns / Decisions Needed\n- None identified\n\n",
+        "## Delivery Map\n\n",
+        "| ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |\n",
+        "| --- | --- | --- | --- | --- | --- |\n",
+        "| T-001 | SC-001 | Packet task | AI | not-started | pending |\n",
+        "| T-002 | SC-002 | Hidden sibling | AI | not-started | pending |\n\n",
+        "## T-001\n\n",
+        "- **Objective**: emit one packet.\n",
+        "- **Scope**: in — focus. out — T-002.\n",
+        "- **Steps**: compile --focus.\n",
+        "- **Acceptance**: sibling absent.\n",
+        "- **Verification**: cargo test\n\n",
+        "## T-002\n\n",
+        "- **Objective**: must not appear.\n",
+        "- **Scope**: out.\n",
+        "- **Steps**: none.\n",
+        "- **Acceptance**: hidden.\n",
+        "- **Verification**: none\n",
+    );
+    let plan = created_id(
+        &belay()
+            .args(["add", "plan", "--title", "Packet plan", "--body", body])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add plan"),
+    );
+    let output = belay()
+        .args([
+            "context",
+            "compile",
+            "--focus",
+            &format!("{plan}#t-001"),
+            "--format",
+            "agent",
+            "--budget",
+            "2500",
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("focus compile");
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("stdout");
+    assert!(stdout.contains("# Task packet:"), "{stdout}");
+    assert!(stdout.contains("stay local"), "{stdout}");
+    assert!(stdout.contains("emit one packet"), "{stdout}");
+    assert!(!stdout.contains("must not appear"), "{stdout}");
+    assert!(!stdout.contains("Hidden sibling"), "{stdout}");
+}
+
+#[test]
+fn generated_skill_documents_working_set_focus_and_archive_candidates() {
+    let temporary = initialize_repository();
+    let skill = fs::read_to_string(temporary.path().join(".belay/agent/codex/SKILL.md"))
+        .expect("read generated skill");
+    for expected in [
+        "belay context compile --format agent --budget 4000",
+        "belay context compile --focus",
+        "belay archive candidates",
+        "Do not start implementation while Unknowns",
+    ] {
+        assert!(skill.contains(expected), "missing {expected} in skill");
+    }
 }

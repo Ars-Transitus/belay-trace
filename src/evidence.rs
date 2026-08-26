@@ -170,7 +170,7 @@ pub fn import_junit(
 }
 
 pub fn status(repository: &Repository, target: &str) -> Result<EvidenceStatus, BelayError> {
-    let target = parse_entry_reference_id(target)?.canonical_id();
+    let target = crate::store::resolve_reference(repository, target)?.canonical_id();
     validate_target(repository, &target)?;
     let database_path = repository.database_path();
     let connection = crate::database::open_read_only(&database_path)?;

@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod archive;
 pub mod browse;
 pub mod cli;
 pub mod config;

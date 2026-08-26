@@ -68,6 +68,25 @@ impl EntryType {
         }
     }
 
+    /// Live working-set membership. `archived` is never live, even if the
+    /// underlying type would otherwise treat the same name as active.
+    pub const fn is_live_status(self, status: EntryStatus) -> bool {
+        if matches!(status, EntryStatus::Archived) {
+            return false;
+        }
+        match self {
+            Self::Goal => matches!(status, EntryStatus::Draft | EntryStatus::Active),
+            Self::Plan => matches!(
+                status,
+                EntryStatus::Draft | EntryStatus::Approved | EntryStatus::Active
+            ),
+            Self::Work => matches!(status, EntryStatus::InProgress | EntryStatus::Blocked),
+            Self::Decision => matches!(status, EntryStatus::Proposed),
+            Self::Review => matches!(status, EntryStatus::Pending),
+            Self::Note => matches!(status, EntryStatus::Active),
+        }
+    }
+
     pub const fn allows_status(self, status: EntryStatus) -> bool {
         match self {
             Self::Goal => matches!(
@@ -77,6 +96,7 @@ impl EntryType {
                     | EntryStatus::Completed
                     | EntryStatus::Superseded
                     | EntryStatus::Abandoned
+                    | EntryStatus::Archived
             ),
             Self::Plan => matches!(
                 status,
@@ -86,6 +106,7 @@ impl EntryType {
                     | EntryStatus::Completed
                     | EntryStatus::Superseded
                     | EntryStatus::Abandoned
+                    | EntryStatus::Archived
             ),
             Self::Decision => matches!(
                 status,
@@ -93,6 +114,7 @@ impl EntryType {
                     | EntryStatus::Accepted
                     | EntryStatus::Rejected
                     | EntryStatus::Superseded
+                    | EntryStatus::Archived
             ),
             Self::Work => matches!(
                 status,
@@ -100,8 +122,12 @@ impl EntryType {
                     | EntryStatus::Blocked
                     | EntryStatus::Completed
                     | EntryStatus::Abandoned
+                    | EntryStatus::Archived
             ),
-            Self::Review => matches!(status, EntryStatus::Pending | EntryStatus::Completed),
+            Self::Review => matches!(
+                status,
+                EntryStatus::Pending | EntryStatus::Completed | EntryStatus::Archived
+            ),
             Self::Note => matches!(status, EntryStatus::Active | EntryStatus::Archived),
         }
     }
@@ -501,6 +527,62 @@ pub fn parse_entry_reference_id(value: &str) -> Result<EntryReferenceParts, Bela
     })
 }
 
+/// Split an entry reference without requiring a canonical display ID.
+/// Fragment syntax matches `parse_entry_reference_id`.
+pub fn split_reference_query(value: &str) -> Result<(String, Option<String>), BelayError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return validation("entry reference must not be empty");
+    }
+    match trimmed.split_once('#') {
+        Some((display_id, fragment)) => {
+            if display_id.is_empty()
+                || fragment.is_empty()
+                || !fragment
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
+            {
+                return Err(BelayError::Validation {
+                    message: format!(
+                        "invalid entry reference {value:?}; fragment must be ASCII letters, digits, or hyphen"
+                    ),
+                });
+            }
+            Ok((display_id.to_owned(), Some(fragment.to_ascii_lowercase())))
+        }
+        None => Ok((trimmed.to_owned(), None)),
+    }
+}
+
+pub fn normalize_id_query(query: &str) -> String {
+    let Some((prefix, rest)) = query.split_once('-') else {
+        return query.to_owned();
+    };
+    match prefix.to_ascii_uppercase().as_str() {
+        "GOAL" | "PLN" | "DEC" | "WRK" | "REV" | "NOTE" => {
+            format!("{}-{rest}", prefix.to_ascii_uppercase())
+        }
+        _ => query.to_owned(),
+    }
+}
+
+/// True when a context task should be treated as an ID seed, not a keyword query.
+pub fn looks_like_entry_id_query(value: &str) -> bool {
+    let Ok((query, fragment)) = split_reference_query(value) else {
+        return false;
+    };
+    fragment.is_some() || has_type_prefix(&normalize_id_query(&query))
+}
+
+fn has_type_prefix(query: &str) -> bool {
+    query.starts_with("GOAL-")
+        || query.starts_with("PLN-")
+        || query.starts_with("DEC-")
+        || query.starts_with("WRK-")
+        || query.starts_with("REV-")
+        || query.starts_with("NOTE-")
+}
+
 fn valid_slug(slug: &str) -> bool {
     !slug.is_empty()
         && !slug.starts_with('-')
@@ -679,7 +761,15 @@ mod tests {
     fn type_specific_statuses_are_validated() {
         assert_eq!(EntryType::Decision.default_status(), EntryStatus::Proposed);
         assert!(EntryType::Decision.allows_status(EntryStatus::Accepted));
+        assert!(EntryType::Decision.allows_status(EntryStatus::Archived));
+        assert!(EntryType::Goal.allows_status(EntryStatus::Archived));
+        assert!(EntryType::Plan.allows_status(EntryStatus::Archived));
+        assert!(EntryType::Work.allows_status(EntryStatus::Archived));
+        assert!(EntryType::Review.allows_status(EntryStatus::Archived));
         assert!(!EntryType::Decision.allows_status(EntryStatus::InProgress));
+        assert!(EntryType::Goal.is_live_status(EntryStatus::Active));
+        assert!(!EntryType::Goal.is_live_status(EntryStatus::Archived));
+        assert!(!EntryType::Goal.is_live_status(EntryStatus::Completed));
     }
 
     #[test]

@@ -5,8 +5,8 @@ type: work
 title: configure-project-agents
 status: completed
 created_at: 2026-08-01T22:16:57+09:00
-updated_at: 2026-08-01T22:24:21+09:00
-revision: 4
+updated_at: 2026-08-18T20:38:50+09:00
+revision: 1
 tags: []
 links:
 - relation: fulfills

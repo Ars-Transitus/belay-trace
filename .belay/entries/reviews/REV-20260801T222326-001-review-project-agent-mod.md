@@ -5,8 +5,8 @@ type: review
 title: review-project-agent-models
 status: completed
 created_at: 2026-08-01T22:23:26+09:00
-updated_at: 2026-08-01T22:24:21+09:00
-revision: 3
+updated_at: 2026-08-18T20:38:50+09:00
+revision: 1
 tags: []
 links:
 - relation: reviews

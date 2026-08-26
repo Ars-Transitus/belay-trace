@@ -5,7 +5,7 @@ type: goal
 title: Make Explore node activation reliable and unambiguous
 status: completed
 created_at: 2026-07-25T19:40:08+09:00
-updated_at: 2026-08-17T18:48:29+09:00
+updated_at: 2026-08-18T20:38:50+09:00
 revision: 1
 tags: []
 links: []

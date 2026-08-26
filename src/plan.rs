@@ -1,7 +1,7 @@
 use rusqlite::OptionalExtension;
 use serde::Serialize;
 
-use crate::entry::{Entry, EntryType, parse_display_id};
+use crate::entry::{Entry, EntryType};
 use crate::error::BelayError;
 use crate::repository::Repository;
 use crate::store;
@@ -318,7 +318,6 @@ fn section_has_field(section: &str, field: &str) -> bool {
 }
 
 fn load_plan(repository: &Repository, id: &str) -> Result<Entry, BelayError> {
-    parse_display_id(id)?;
     let shown = store::show(repository, id)?;
     if shown.entry.entry_type != EntryType::Plan {
         return Err(BelayError::Validation {

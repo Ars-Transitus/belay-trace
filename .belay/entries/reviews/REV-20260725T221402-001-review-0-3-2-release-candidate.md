@@ -5,7 +5,7 @@ type: review
 title: Review 0.3.2 release candidate
 status: completed
 created_at: 2026-07-25T22:14:02+09:00
-updated_at: 2026-08-17T18:48:29+09:00
+updated_at: 2026-08-18T20:38:50+09:00
 revision: 1
 tags: []
 links:

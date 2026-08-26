@@ -54,6 +54,7 @@ pub fn generate(
     task: &str,
     format: ContextFormat,
     budget: usize,
+    include_archived: bool,
 ) -> Result<ContextBundle, BelayError> {
     if task.trim().is_empty() {
         return Err(BelayError::Validation {
@@ -72,13 +73,14 @@ pub fn generate(
             query: task.to_owned(),
             entry_type: None,
             status_include: Vec::new(),
-            status_exclude: Vec::new(),
+            status_exclude: archived_exclude(include_archived),
             tag: None,
             display_id: None,
             limit: PRIMARY_RESULT_LIMIT,
         },
     )?;
     let linked = search::linked_results(repository, &primary, LINKED_RESULT_LIMIT)?;
+    let linked = filter_archived(linked, include_archived);
     let terms = query_terms(task);
     let mut candidates = load_candidates(repository, &terms, primary, true)?;
     candidates.extend(load_candidates(repository, &terms, linked, false)?);
@@ -163,11 +165,16 @@ pub fn compile(
     format: ContextFormat,
     budget: usize,
     seeds: &[String],
+    include_archived: bool,
 ) -> Result<ContextBundle, BelayError> {
     if task.trim().is_empty() {
-        return Err(BelayError::Validation {
-            message: "context compile task must not be empty".to_owned(),
-        });
+        return compile_working_set(repository, format, budget, include_archived);
+    }
+    let mut seeds = seeds.to_vec();
+    if crate::entry::looks_like_entry_id_query(task) {
+        if let Ok(resolved) = crate::store::resolve_reference(repository, task) {
+            seeds.push(resolved.display_id.clone());
+        }
     }
     let base_budget = budget.saturating_mul(6) / 10;
     let base = generate(
@@ -175,8 +182,9 @@ pub fn compile(
         task,
         format,
         base_budget.max(MIN_CONTEXT_BUDGET),
+        include_archived,
     )?;
-    let goals = compile_goals(repository, task, seeds)?;
+    let goals = compile_goals(repository, task, &seeds, include_archived)?;
     let failures = compile_failures(repository)?;
     let mut output = match format {
         ContextFormat::Agent => format!(
@@ -263,6 +271,7 @@ fn compile_goals(
     repository: &Repository,
     task: &str,
     seeds: &[String],
+    include_archived: bool,
 ) -> Result<Vec<CompileEntry>, BelayError> {
     let mut results = Vec::new();
     for seed in seeds {
@@ -282,7 +291,7 @@ fn compile_goals(
             query: task.to_owned(),
             entry_type: Some(EntryType::Goal),
             status_include: Vec::new(),
-            status_exclude: Vec::new(),
+            status_exclude: archived_exclude(include_archived),
             tag: None,
             display_id: None,
             limit: 5,
@@ -341,15 +350,26 @@ fn compile_failures(repository: &Repository) -> Result<Vec<CompileEntry>, BelayE
 }
 
 fn section_text(body: &str, wanted: &str) -> Option<String> {
+    heading_block(body, "## ", wanted)
+}
+
+fn subsection_text(body: &str, wanted: &str) -> Option<String> {
+    heading_block(body, "### ", wanted)
+}
+
+fn heading_block(body: &str, marker: &str, wanted: &str) -> Option<String> {
     let mut in_section = false;
     let mut text = String::new();
     for line in body.lines() {
-        if let Some(title) = line.strip_prefix("## ") {
+        if let Some(title) = line.strip_prefix(marker) {
             if in_section {
                 break;
             }
             in_section = title.trim().eq_ignore_ascii_case(wanted);
             continue;
+        }
+        if marker == "### " && line.starts_with("## ") && in_section {
+            break;
         }
         if in_section {
             text.push_str(line);
@@ -358,6 +378,387 @@ fn section_text(body: &str, wanted: &str) -> Option<String> {
     }
     let text = text.trim();
     (!text.is_empty()).then(|| text.to_owned())
+}
+
+fn archived_exclude(include_archived: bool) -> Vec<crate::entry::EntryStatus> {
+    let mut exclude = Vec::new();
+    crate::search::apply_default_archived_exclude(&[], &mut exclude, include_archived);
+    exclude
+}
+
+fn filter_archived(results: Vec<SearchResult>, include_archived: bool) -> Vec<SearchResult> {
+    if include_archived {
+        return results;
+    }
+    results
+        .into_iter()
+        .filter(|result| result.status != crate::entry::EntryStatus::Archived)
+        .collect()
+}
+
+pub fn compile_working_set(
+    repository: &Repository,
+    format: ContextFormat,
+    budget: usize,
+    include_archived: bool,
+) -> Result<ContextBundle, BelayError> {
+    let live = live_entries(repository, include_archived)?;
+    let next = next_actions(repository, &live)?;
+    let seeds = live
+        .iter()
+        .filter(|entry| entry.entry_type == EntryType::Goal)
+        .map(|entry| entry.display_id.clone())
+        .collect::<Vec<_>>();
+    let goals = compile_goals(repository, "working set", &seeds, include_archived)?;
+    let failures = compile_failures(repository)?;
+    let primary_ids = live
+        .iter()
+        .map(|entry| entry.display_id.clone())
+        .collect::<Vec<_>>();
+    let ranked_task = live
+        .iter()
+        .map(|entry| entry.title.as_str())
+        .find(|title| !title.is_empty())
+        .unwrap_or("working set");
+    let base_budget = budget.saturating_mul(5) / 10;
+    let base = if live.is_empty() {
+        None
+    } else {
+        Some(generate(
+            repository,
+            ranked_task,
+            format,
+            base_budget.max(MIN_CONTEXT_BUDGET),
+            include_archived,
+        )?)
+    };
+
+    let mut output = match format {
+        ContextFormat::Agent => format!("# Working set\n(compiled by belay, budget={budget})\n\n"),
+        ContextFormat::Human => format!("# Working set\n\nBudget: {budget}\n\n"),
+    };
+    output.push_str("## Next\n");
+    if next.is_empty() {
+        output.push_str("No in-progress or not-started Delivery Map tasks in live plans.\n\n");
+    } else {
+        for item in &next {
+            output.push_str(&format!(
+                "- {} [{}] {} — belay show {}\n",
+                item.reference, item.state, item.outcome, item.reference
+            ));
+        }
+        output.push('\n');
+    }
+    output.push_str("## Live entries\n");
+    if live.is_empty() {
+        output.push_str("No live entries in the working set.\n\n");
+    } else {
+        for entry in &live {
+            output.push_str(&format!(
+                "- {} [{}] {}: {}\n",
+                entry.display_id, entry.status, entry.entry_type, entry.title
+            ));
+        }
+        output.push('\n');
+    }
+    output.push_str("## Goals\n");
+    if goals.is_empty() {
+        output.push_str("No live goals found.\n\n");
+    } else {
+        for goal in &goals {
+            output.push_str(&format!(
+                "- {} [{}]: {}\n",
+                goal.display_id, goal.status, goal.title
+            ));
+            for section in ["Success Criteria", "Constraints", "Non-goals"] {
+                if let Some(text) = section_text(&goal.body, section) {
+                    let text = truncate_at_boundary(&text, 180);
+                    if !text.is_empty() {
+                        output.push_str(&format!("  {section}: {}\n", text.replace('\n', " ")));
+                    }
+                }
+            }
+        }
+        output.push('\n');
+    }
+    output.push_str("## Past failures\n");
+    if failures.is_empty() {
+        output.push_str("None found.\n\n");
+    } else {
+        for failure in failures {
+            output.push_str(&format!(
+                "- {} [{}]: {}\n",
+                failure.display_id, failure.status, failure.title
+            ));
+        }
+        output.push('\n');
+    }
+    if let Some(base) = base {
+        output.push_str("## Ranked context\n\n");
+        output.push_str(&base.text);
+        output.push_str("\n## Sources\n");
+        for id in &primary_ids {
+            output.push_str(&format!("- {id}\n"));
+        }
+    }
+    if estimate_tokens(&output) > budget {
+        output = truncate_at_boundary(&output, budget);
+    }
+    Ok(ContextBundle {
+        estimated_tokens: estimate_tokens(&output),
+        included_entries: live.len() + goals.len(),
+        text: output,
+    })
+}
+
+struct LiveEntry {
+    display_id: String,
+    entry_type: EntryType,
+    status: crate::entry::EntryStatus,
+    title: String,
+    body: String,
+}
+
+struct NextAction {
+    reference: String,
+    state: String,
+    outcome: String,
+}
+
+fn live_entries(
+    repository: &Repository,
+    include_archived: bool,
+) -> Result<Vec<LiveEntry>, BelayError> {
+    let database_path = repository.database_path();
+    let connection = crate::database::open_read_only(&database_path)?;
+    let mut statement = connection
+        .prepare(
+            "
+            SELECT display_id, type, status, title, body
+            FROM entries
+            ORDER BY updated_at DESC, display_id
+            ",
+        )
+        .map_err(|source| BelayError::sqlite(&database_path, source))?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|source| BelayError::sqlite(&database_path, source))?;
+    let mut live = Vec::new();
+    for row in rows {
+        let (display_id, entry_type, status, title, body) =
+            row.map_err(|source| BelayError::sqlite(&database_path, source))?;
+        let entry_type = entry_type.parse::<EntryType>()?;
+        let status = status.parse::<crate::entry::EntryStatus>()?;
+        if !include_archived && status == crate::entry::EntryStatus::Archived {
+            continue;
+        }
+        if entry_type.is_live_status(status) {
+            live.push(LiveEntry {
+                display_id,
+                entry_type,
+                status,
+                title,
+                body,
+            });
+        }
+    }
+    Ok(live)
+}
+
+fn next_actions(
+    repository: &Repository,
+    live: &[LiveEntry],
+) -> Result<Vec<NextAction>, BelayError> {
+    let _ = repository;
+    let mut next = Vec::new();
+    for entry in live
+        .iter()
+        .filter(|entry| entry.entry_type == EntryType::Plan)
+    {
+        let rows = crate::trace_ids::delivery_map_rows(&entry.body);
+        let mut in_progress = Vec::new();
+        let mut first_not_started = None;
+        for row in rows {
+            let state = row.cell("State").unwrap_or("").trim().to_ascii_lowercase();
+            let outcome = row
+                .cell("Outcome / Task")
+                .or_else(|| row.cell("Outcome"))
+                .or_else(|| row.cell("Task"))
+                .unwrap_or("")
+                .trim()
+                .to_owned();
+            let reference = format!("{}#{}", entry.display_id, row.id.to_ascii_lowercase());
+            if state == "in-progress" {
+                in_progress.push(NextAction {
+                    reference,
+                    state,
+                    outcome,
+                });
+            } else if state == "not-started" && first_not_started.is_none() {
+                first_not_started = Some(NextAction {
+                    reference,
+                    state,
+                    outcome,
+                });
+            }
+        }
+        if in_progress.is_empty() {
+            if let Some(item) = first_not_started {
+                next.push(item);
+            }
+        } else {
+            next.extend(in_progress);
+        }
+    }
+    Ok(next)
+}
+
+pub fn compile_focus(
+    repository: &Repository,
+    focus: &str,
+    format: ContextFormat,
+    budget: usize,
+) -> Result<ContextBundle, BelayError> {
+    let shown = crate::store::show(repository, focus)?;
+    let Some(fragment) = shown.fragment.as_ref() else {
+        return Err(BelayError::Validation {
+            message: "--focus requires a canonical fragment such as PLN-...#t-001".to_owned(),
+        });
+    };
+    let canonical = format!("{}#{}", shown.entry.display_id, fragment.fragment);
+    let constraints = subsection_text(&shown.entry.body, "Constraints")
+        .or_else(|| section_text(&shown.entry.body, "Constraints"));
+    let non_goals = subsection_text(&shown.entry.body, "Non-goals")
+        .or_else(|| section_text(&shown.entry.body, "Non-goals"));
+    let assumptions = subsection_text(&shown.entry.body, "Assumptions")
+        .or_else(|| subsection_text(&shown.entry.body, "Assumptions / Unknowns"));
+
+    let mut output = match format {
+        ContextFormat::Agent => {
+            format!("# Task packet: {canonical}\n(compiled by belay, budget={budget})\n\n")
+        }
+        ContextFormat::Human => format!("# Task packet: {canonical}\n\nBudget: {budget}\n\n"),
+    };
+    output.push_str("## Intent Brief\n");
+    for (label, text) in [
+        ("Constraints", constraints),
+        ("Non-goals", non_goals),
+        ("Assumptions", assumptions),
+    ] {
+        match text {
+            Some(text) => output.push_str(&format!("### {label}\n{text}\n\n")),
+            None => output.push_str(&format!("### {label}\nNone identified\n\n")),
+        }
+    }
+    output.push_str("## Task\n");
+    output.push_str(&format!("Definition:\n{}\n\n", fragment.definition));
+    match &fragment.section {
+        Some(section) => output.push_str(&format!("Section:\n{section}\n\n")),
+        None => output.push_str("Section: none\n\n"),
+    }
+
+    output.push_str("## Goal item\n");
+    match goal_item_for_task(&shown.entry.body, &fragment.fragment) {
+        Some(goal_item) => {
+            output.push_str(&format!("{goal_item}\n"));
+            if let Some(packet) = load_goal_item_packet(repository, &shown.entry, &goal_item)? {
+                output.push_str(&packet);
+            }
+            output.push('\n');
+        }
+        None => output.push_str("None identified\n\n"),
+    }
+
+    output.push_str("## Evidence\n");
+    let records = crate::evidence::latest_for_target(repository, &canonical).unwrap_or_default();
+    if records.is_empty() {
+        output.push_str("None found.\n");
+    } else {
+        for record in records {
+            output.push_str(&format!(
+                "- {} {} {} {} {}\n",
+                record.display_id,
+                record.verdict,
+                record.kind,
+                record.source,
+                record.freshness.label()
+            ));
+        }
+    }
+
+    if estimate_tokens(&output) > budget {
+        output = truncate_at_boundary(&output, budget);
+    }
+    Ok(ContextBundle {
+        estimated_tokens: estimate_tokens(&output),
+        included_entries: 1,
+        text: output,
+    })
+}
+
+fn goal_item_for_task(body: &str, fragment: &str) -> Option<String> {
+    crate::trace_ids::delivery_map_rows(body)
+        .into_iter()
+        .find(|row| row.id.eq_ignore_ascii_case(fragment))
+        .and_then(|row| {
+            row.cell("Goal item")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+        })
+}
+
+fn load_goal_item_packet(
+    repository: &Repository,
+    plan: &crate::entry::Entry,
+    goal_item: &str,
+) -> Result<Option<String>, BelayError> {
+    let reference = if goal_item.contains('#') || crate::entry::looks_like_entry_id_query(goal_item)
+    {
+        goal_item.to_owned()
+    } else {
+        let Some(goal_id) = plan.links.iter().find_map(|link| {
+            (link.relation == crate::entry::LinkRelation::Fulfills
+                || link.relation == crate::entry::LinkRelation::Implements)
+                .then(|| {
+                    crate::entry::parse_entry_reference_id(&link.id)
+                        .ok()
+                        .filter(|reference| {
+                            crate::store::show(repository, &reference.display_id)
+                                .ok()
+                                .is_some_and(|shown| shown.entry.entry_type == EntryType::Goal)
+                        })
+                        .map(|reference| reference.display_id)
+                })
+                .flatten()
+        }) else {
+            return Ok(None);
+        };
+        format!(
+            "{goal_id}#{fragment}",
+            fragment = goal_item.to_ascii_lowercase()
+        )
+    };
+    let shown = crate::store::show(repository, &reference)?;
+    let mut text = format!("Resolved: {}\n", shown.entry.display_id);
+    if let Some(fragment) = shown.fragment {
+        text.push_str(&format!("Definition:\n{}\n", fragment.definition));
+        if let Some(section) = fragment.section {
+            text.push_str(&format!("Section:\n{section}\n"));
+        }
+    } else {
+        text.push_str(&shown.entry.body);
+        text.push('\n');
+    }
+    Ok(Some(text))
 }
 
 fn load_candidates(

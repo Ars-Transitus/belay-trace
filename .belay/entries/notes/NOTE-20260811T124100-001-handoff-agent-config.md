@@ -5,8 +5,8 @@ type: note
 title: handoff-agent-config
 status: active
 created_at: 2026-08-11T12:41:00+09:00
-updated_at: 2026-08-11T12:44:02+09:00
-revision: 4
+updated_at: 2026-08-18T20:38:50+09:00
+revision: 1
 tags: []
 links: []
 metadata: {}

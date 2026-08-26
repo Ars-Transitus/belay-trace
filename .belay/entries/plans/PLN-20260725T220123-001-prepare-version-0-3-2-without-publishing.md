@@ -5,7 +5,7 @@ type: plan
 title: Prepare version 0.3.2 without publishing
 status: completed
 created_at: 2026-07-25T22:01:23+09:00
-updated_at: 2026-08-17T18:48:29+09:00
+updated_at: 2026-08-18T20:38:50+09:00
 revision: 1
 tags: []
 links:

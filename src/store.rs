@@ -21,8 +21,9 @@ use std::os::fd::OwnedFd;
 
 use crate::database;
 use crate::entry::{
-    Entry, EntryLink, EntryStatus, EntryType, LinkRelation, MetadataValue, allocate_display_id,
-    begin_immediate, parse_display_id, parse_entry_reference_id,
+    Entry, EntryLink, EntryReferenceParts, EntryStatus, EntryType, LinkRelation, MetadataValue,
+    allocate_display_id, begin_immediate, normalize_id_query, parse_display_id,
+    parse_entry_reference_id, split_reference_query,
 };
 use crate::error::BelayError;
 use crate::markdown::{self, EntryChunk};
@@ -277,9 +278,9 @@ fn create_with_metadata_internal(
 }
 
 pub fn show(repository: &Repository, reference: &str) -> Result<ShownEntry, BelayError> {
-    let reference = parse_entry_reference_id(reference)?;
     let database_path = repository.database_path();
     let connection = database::open(&database_path)?;
+    let reference = resolve_reference_on(&connection, &database_path, reference)?;
     let mut shown = load_shown_entry(&connection, &database_path, &reference.display_id)?;
     if let Some(fragment) = reference.fragment.as_deref() {
         // Reuse link validation so a fragment means the same thing whether it
@@ -395,14 +396,14 @@ fn link_with_expected_revision_and_receipt(
     expected_revision: Option<u32>,
     receipt: Option<RouteReceipt<'_>>,
 ) -> Result<RouteMutationOutcome<String>, BelayError> {
-    parse_display_id(from)?;
-    let to_reference = parse_entry_reference_id(to)?;
-    if from == to_reference.display_id {
+    let database_path = repository.database_path();
+    let mut connection = database::open(&database_path)?;
+    let from_display_id = resolve_display_id_on(&connection, &database_path, from)?;
+    let to_reference = resolve_reference_on(&connection, &database_path, to)?;
+    if from_display_id == to_reference.display_id {
         return validation("entry links must not target the same display ID");
     }
 
-    let database_path = repository.database_path();
-    let mut connection = database::open(&database_path)?;
     let transaction = begin_immediate(&mut connection, &database_path)?;
     if let Some(receipt) = receipt {
         if let Some((outcome, target, post_revision)) =
@@ -417,13 +418,13 @@ fn link_with_expected_revision_and_receipt(
             });
         }
     }
-    let from_id = resolve_internal_id(&transaction, &database_path, from)?;
+    let from_id = resolve_internal_id(&transaction, &database_path, &from_display_id)?;
     let to_id = resolve_internal_id(&transaction, &database_path, &to_reference.display_id)?;
     ensure_expected_revision(
         &transaction,
         &database_path,
         from_id,
-        from,
+        &from_display_id,
         expected_revision,
     )?;
     validate_reference_fragment(&transaction, &database_path, &to_reference)?;
@@ -445,7 +446,10 @@ fn link_with_expected_revision_and_receipt(
         )
         .map_err(|source| BelayError::sqlite(&database_path, source))?;
     if inserted == 0 {
-        let target = format!("{from} {relation} {to}");
+        let target = format!(
+            "{from_display_id} {relation} {}",
+            to_reference.canonical_id()
+        );
         let post_revision = entry_revision(&transaction, &database_path, from_id)?;
         if let Some(receipt) = receipt {
             insert_route_receipt(
@@ -476,7 +480,10 @@ fn link_with_expected_revision_and_receipt(
         &expected_mirror_hash,
     )?;
     let post_revision = entry_revision(&transaction, &database_path, from_id)?;
-    let target = format!("{from} {relation} {to}");
+    let target = format!(
+        "{from_display_id} {relation} {}",
+        to_reference.canonical_id()
+    );
     if let Some(receipt) = receipt {
         insert_route_receipt(
             &transaction,
@@ -560,9 +567,9 @@ fn set_status_with_expected_revision_and_receipt(
     expected_revision: Option<u32>,
     receipt: Option<RouteReceipt<'_>>,
 ) -> Result<RouteMutationOutcome<String>, BelayError> {
-    parse_display_id(display_id)?;
     let database_path = repository.database_path();
     let mut connection = database::open(&database_path)?;
+    let display_id = resolve_display_id_on(&connection, &database_path, display_id)?;
     let transaction = begin_immediate(&mut connection, &database_path)?;
     if let Some(receipt) = receipt {
         if let Some((outcome, target, post_revision)) =
@@ -577,12 +584,12 @@ fn set_status_with_expected_revision_and_receipt(
             });
         }
     }
-    let internal_id = resolve_internal_id(&transaction, &database_path, display_id)?;
+    let internal_id = resolve_internal_id(&transaction, &database_path, &display_id)?;
     ensure_expected_revision(
         &transaction,
         &database_path,
         internal_id,
-        display_id,
+        &display_id,
         expected_revision,
     )?;
     let entry_type = transaction
@@ -616,7 +623,7 @@ fn set_status_with_expected_revision_and_receipt(
                 &database_path,
                 receipt,
                 MutationOutcome::Unchanged,
-                display_id,
+                &display_id,
                 post_revision,
                 &now_string(),
             )?;
@@ -651,7 +658,7 @@ fn set_status_with_expected_revision_and_receipt(
             &database_path,
             receipt,
             MutationOutcome::Changed,
-            display_id,
+            &display_id,
             post_revision,
             &now_string(),
         )?;
@@ -1093,6 +1100,137 @@ pub(crate) fn resolve_internal_id(
         .ok_or_else(|| BelayError::Validation {
             message: format!("entry {display_id} was not found"),
         })
+}
+
+pub fn resolve_reference(
+    repository: &Repository,
+    value: &str,
+) -> Result<EntryReferenceParts, BelayError> {
+    let database_path = repository.database_path();
+    let connection = database::open_read_only(&database_path)?;
+    resolve_reference_on(&connection, &database_path, value)
+}
+
+pub(crate) fn resolve_reference_on(
+    connection: &Connection,
+    database_path: &Path,
+    value: &str,
+) -> Result<EntryReferenceParts, BelayError> {
+    let (query, fragment) = split_reference_query(value)?;
+    let display_id = resolve_display_id_on(connection, database_path, &query)?;
+    Ok(EntryReferenceParts {
+        display_id,
+        fragment,
+    })
+}
+
+fn resolve_display_id_on(
+    connection: &Connection,
+    database_path: &Path,
+    query: &str,
+) -> Result<String, BelayError> {
+    let query = normalize_id_query(query.trim());
+    if query.is_empty() {
+        return validation("entry reference must not be empty");
+    }
+
+    if let Some(display_id) = connection
+        .query_row(
+            "SELECT display_id FROM entries WHERE display_id = ?1",
+            [&query],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|source| BelayError::sqlite(database_path, source))?
+    {
+        return Ok(display_id);
+    }
+
+    if parse_display_id(&query).is_ok() {
+        return validation(format!("entry {query} was not found"));
+    }
+
+    let escaped = like_escape(&query);
+    if has_entry_type_prefix(&query) {
+        let pattern = format!("{escaped}%");
+        let matches = prefixed_display_ids(connection, database_path, &pattern)?;
+        match matches.as_slice() {
+            [only] => return Ok(only.clone()),
+            [] => {}
+            many => return ambiguous_reference(&query, many),
+        }
+    }
+
+    let slug_matches = slug_display_ids(connection, database_path, &query)?;
+    match slug_matches.as_slice() {
+        [only] => Ok(only.clone()),
+        [] => validation(format!("entry {query} was not found")),
+        many => ambiguous_reference(&query, many),
+    }
+}
+
+fn has_entry_type_prefix(query: &str) -> bool {
+    query.starts_with("GOAL-")
+        || query.starts_with("PLN-")
+        || query.starts_with("DEC-")
+        || query.starts_with("WRK-")
+        || query.starts_with("REV-")
+        || query.starts_with("NOTE-")
+}
+
+fn like_escape(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+fn prefixed_display_ids(
+    connection: &Connection,
+    database_path: &Path,
+    pattern: &str,
+) -> Result<Vec<String>, BelayError> {
+    let mut statement = connection
+        .prepare(
+            "SELECT display_id FROM entries WHERE display_id LIKE ?1 ESCAPE '\\' ORDER BY display_id",
+        )
+        .map_err(|source| BelayError::sqlite(database_path, source))?;
+    let rows = statement
+        .query_map([pattern], |row| row.get::<_, String>(0))
+        .map_err(|source| BelayError::sqlite(database_path, source))?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(|source| BelayError::sqlite(database_path, source))
+}
+
+fn slug_display_ids(
+    connection: &Connection,
+    database_path: &Path,
+    query: &str,
+) -> Result<Vec<String>, BelayError> {
+    let mut statement = connection
+        .prepare("SELECT display_id FROM entries ORDER BY display_id")
+        .map_err(|source| BelayError::sqlite(database_path, source))?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|source| BelayError::sqlite(database_path, source))?;
+    let mut matches = Vec::new();
+    for display_id in rows {
+        let display_id = display_id.map_err(|source| BelayError::sqlite(database_path, source))?;
+        let Ok(parts) = parse_display_id(&display_id) else {
+            continue;
+        };
+        if parts.slug == query || parts.slug.starts_with(query) {
+            matches.push(display_id);
+        }
+    }
+    Ok(matches)
+}
+
+fn ambiguous_reference(query: &str, matches: &[String]) -> Result<String, BelayError> {
+    validation(format!(
+        "entry reference {query:?} is ambiguous; matches: {}",
+        matches.join(", ")
+    ))
 }
 
 pub(crate) fn replace_tags(

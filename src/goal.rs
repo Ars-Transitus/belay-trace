@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 use crate::context::{self, ContextFormat};
-use crate::entry::{Entry, EntryStatus, EntryType, LinkRelation, parse_display_id};
+use crate::entry::{Entry, EntryStatus, EntryType, LinkRelation};
 use crate::error::BelayError;
 use crate::repository::Repository;
 use crate::store;
@@ -155,7 +155,7 @@ pub fn improve(repository: &Repository, id: &str, budget: usize) -> Result<Strin
     let goal = load_goal(repository, id)?;
     let reports = lint(repository, Some(id), false)?;
     let lint_text = render_lint(&reports, GoalLintFormat::Human, false)?;
-    let context = context::generate(repository, &goal.title, ContextFormat::Agent, budget)?;
+    let context = context::generate(repository, &goal.title, ContextFormat::Agent, budget, false)?;
     Ok(format!(
         "# Goal Improvement Bundle\n\n\
          Target: {}\n\
@@ -309,7 +309,6 @@ pub fn lint_entry(
 }
 
 fn load_goal(repository: &Repository, id: &str) -> Result<Entry, BelayError> {
-    parse_display_id(id)?;
     let shown = store::show(repository, id)?;
     if shown.entry.entry_type != EntryType::Goal {
         return Err(BelayError::Validation {

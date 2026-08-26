@@ -1,9 +1,0 @@
-# Read and inspect commands are safe inside the workspace-write sandbox.
-# The sandbox remains the boundary for paths outside the workspace.
-prefix_rule(pattern = ["sed"], decision = "allow", justification = "workspace file inspection")
-prefix_rule(pattern = ["rg"], decision = "allow", justification = "workspace text search")
-prefix_rule(pattern = ["find"], decision = "allow", justification = "workspace file discovery")
-prefix_rule(pattern = ["ls"], decision = "allow", justification = "workspace directory inspection")
-prefix_rule(pattern = ["cat"], decision = "allow", justification = "workspace file inspection")
-prefix_rule(pattern = ["head"], decision = "allow", justification = "workspace file inspection")
-prefix_rule(pattern = ["tail"], decision = "allow", justification = "workspace file inspection")

@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use sha2::Digest;
 
-use crate::entry::{EntryStatus, EntryType, LinkRelation, parse_display_id};
+use crate::entry::{EntryStatus, EntryType, LinkRelation};
 use crate::error::BelayError;
 use crate::evidence::{self, Freshness};
 use crate::repository::Repository;
@@ -64,9 +64,19 @@ pub fn report(
     target: Option<&str>,
     include_completed: bool,
 ) -> Result<CoverageReport, BelayError> {
-    if let Some(target) = target {
-        parse_display_id(target)?;
-    }
+    let resolved_target = match target {
+        Some(target) => {
+            let resolved = crate::store::resolve_reference(repository, target)?;
+            if resolved.fragment.is_some() {
+                return Err(BelayError::Validation {
+                    message: "coverage target must be a Goal entry, not a fragment".to_owned(),
+                });
+            }
+            Some(resolved.display_id)
+        }
+        None => None,
+    };
+    let target = resolved_target.as_deref();
     let database_path = repository.database_path();
     let connection = crate::database::open_read_only(&database_path)?;
     let goals = load_goals(&connection, &database_path, target, include_completed)?;
