@@ -1,0 +1,4 @@
+# Written by the installer, per project: belay assigns a Note ID on creation,
+# so the role-to-Note map is generated rather than bundled.
+herdr-routing/policy-notes.json
+state/
