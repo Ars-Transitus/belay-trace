@@ -263,6 +263,14 @@ pub fn synchronize(
             }
         }
     }
+
+    if let Err(error) = crate::evidence::reindex(repository) {
+        report.failures.push(SyncFailure {
+            subject: "evidence".to_owned(),
+            message: error.to_string(),
+            exit_code: error.exit_code(),
+        });
+    }
     Ok(report)
 }
 
@@ -706,7 +714,13 @@ fn ensure_database_snapshot(
     Ok(())
 }
 
-pub fn rebuild(repository: &Repository) -> Result<usize, BelayError> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RebuildOutcome {
+    pub entries: usize,
+    pub evidence: usize,
+}
+
+pub fn rebuild(repository: &Repository) -> Result<RebuildOutcome, BelayError> {
     let inventory = discover_mirrors(repository)?;
     validate_link_targets(&inventory)?;
     let database_path = repository.database_path();
@@ -741,7 +755,7 @@ pub fn rebuild(repository: &Repository) -> Result<usize, BelayError> {
                 &now(),
             )?;
         }
-        crate::evidence::rebuild_into(repository, &transaction, &temporary)?;
+        let evidence = crate::evidence::rebuild_into(repository, &transaction, &temporary)?;
         for receipt in &route_receipts {
             transaction
                 .execute(
@@ -759,17 +773,23 @@ pub fn rebuild(repository: &Repository) -> Result<usize, BelayError> {
         }
         transaction.commit()?;
         drop(connection);
-        Ok::<(), BelayError>(())
+        Ok(evidence)
     })();
-    if let Err(error) = build_result {
-        let _ = fs::remove_file(&temporary);
-        return Err(error);
-    }
+    let evidence = match build_result {
+        Ok(evidence) => evidence,
+        Err(error) => {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
+    };
     if let Err(error) = replace_database(&database_path, &temporary, &backup) {
         let _ = fs::remove_file(&temporary);
         return Err(error);
     }
-    Ok(inventory.entries.len())
+    Ok(RebuildOutcome {
+        entries: inventory.entries.len(),
+        evidence,
+    })
 }
 
 type RouteReceiptRecord = (String, String, String, String, String, u32, String);
