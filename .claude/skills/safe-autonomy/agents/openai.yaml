@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safe Autonomy"
+  short_description: "Run Claude loops with repository safety gates and belay"
+  default_prompt: "Use the shared safe-autonomy policy and belay evidence for this Claude task."

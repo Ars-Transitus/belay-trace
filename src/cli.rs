@@ -186,6 +186,10 @@ const SHOW_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Displays one complete entry, its managed source path, and inbound and outbound links
   using display IDs. It does not change repository state.
 
+  Evidence IDs (`EVD-...`) are resolved from `.belay/evidence/*.ndjson` even when
+  SQLite has not indexed the record. Exact IDs and unique prefixes succeed;
+  slugs and fragments are rejected. Show never writes Evidence or Entry state.
+
   Appending a canonical fragment displays only that item: the line defining it
   and the body section headed with its ID. Use it to read one Success Criterion
   or one Delivery Map task without paying for the whole entry. A fragment that
@@ -199,16 +203,18 @@ const SHOW_AFTER_HELP: &str = r#"Behavior and Side Effects:
   belay show GOAL-20260723T120000-001-safe-sync#sc-001
   belay show retrieval-hygiene-archive
   belay show PLN-20260723#t-001
+  belay show EVD-20260723T120500-001
+  belay show EVD-20260723T120500
 
 Exit Status:
-  0  Entry displayed
+  0  Entry or Evidence displayed
   2  Invalid invocation
   3  Repository not initialized
-  4  Invalid display ID, invalid fragment, or entry not found
+  4  Invalid display ID, invalid fragment, or entry/Evidence not found
   6  Storage failure
 
 Related Commands:
-  `belay search` and `belay context`."#;
+  `belay search`, `belay verify status`, and `belay context`."#;
 
 const SEARCH_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Performs exact display-ID lookup, structured filtering, or deduplicated
@@ -330,6 +336,10 @@ const VERIFY_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Evidence is linked to Goal, Decision, Work, or Goal item references and is never
   edited in place; updates are represented by new records.
 
+  Retrieve a record with `belay show EVD-...` from NDJSON. Herdr and other runners
+  keep their own provenance; `show EVD` is not a required settlement gate.
+  Task settlement and Goal coverage remain separate judgments.
+
 Examples:
   belay verify record --kind test --verdict pass --source "cargo test" --summary "all tests passed" --verifies GOAL-...
   belay verify import --junit target/junit.xml --verifies WRK-...
@@ -343,7 +353,7 @@ Exit Status:
   6  Storage or filesystem failure
 
 Related Commands:
-  `belay coverage`, `belay doctor`, and `belay rebuild`."#;
+  `belay show`, `belay coverage`, `belay doctor`, and `belay rebuild`."#;
 
 const COVERAGE_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Computes Goal Coverage for active Goals, separating link-based traceability from
@@ -371,6 +381,10 @@ const SYNC_AFTER_HELP: &str = r#"Behavior and Side Effects:
   counterparts are restored, and conflicts preserve both sides. Batch sync is
   atomic per entry. Explicit --prefer resolution is entry-scoped.
 
+  After Entry reconciliation, valid `.belay/evidence/*.ndjson` mirrors are indexed
+  into SQLite in one transaction. Validation or duplicate failure keeps the
+  previous Evidence index.
+
 Examples:
   belay sync
   belay sync DEC-20260606T115000-001-sqlite
@@ -389,9 +403,11 @@ Related Commands:
   `belay doctor`, `belay rebuild`, and `belay show`."#;
 
 const REBUILD_AFTER_HELP: &str = r#"Behavior and Side Effects:
-  Validates every managed Markdown entry before creating a temporary replacement
-  database. Restores entries, links, chunks, FTS, and fresh sync baselines. The
-  active database is replaced only after the temporary database is complete.
+  Validates every managed Markdown entry and Evidence mirror before creating a
+  temporary replacement database. Restores entries, links, chunks, FTS, fresh
+  sync baselines, and the Evidence index. The active database is replaced only
+  after the temporary database is complete. Output reports managed Markdown
+  counts and Evidence counts separately.
 
 Examples:
   belay rebuild
@@ -555,7 +571,7 @@ enum Command {
     Status(StatusArgs),
 
     #[command(
-        about = "Display a trace entry",
+        about = "Display a trace entry or Evidence record",
         after_help = SHOW_AFTER_HELP
     )]
     Show(ShowArgs),
@@ -766,7 +782,7 @@ struct EntryIdArgs {
 
 #[derive(Debug, Args)]
 struct ShowArgs {
-    /// Entry display ID, unique prefix, or slug, optionally with `#sc-NNN` or `#t-NNN`.
+    /// Entry display ID, unique prefix, or slug, optionally with `#sc-NNN` or `#t-NNN`; or an Evidence `EVD-...` ID or unique prefix.
     id: String,
 }
 
@@ -1156,8 +1172,11 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
                 );
             }
             if arguments.reset_state {
-                let count = reconcile::rebuild(&outcome.repository)?;
-                println!("Rebuilt local state from {count} Markdown entries");
+                let rebuilt = reconcile::rebuild(&outcome.repository)?;
+                println!(
+                    "Rebuilt local state from {} Markdown entries and {} Evidence records",
+                    rebuilt.entries, rebuilt.evidence
+                );
             }
             for target in arguments.install_skill {
                 let (name, activation) = match target {
@@ -1240,8 +1259,13 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
         }
         Command::Show(arguments) => {
             let repository = repository::discover(current_dir)?;
-            let shown = store::show(&repository, &arguments.id)?;
-            print_shown_entry(&shown);
+            if evidence::looks_like_evidence_query(&arguments.id) {
+                let shown = evidence::show(&repository, &arguments.id)?;
+                print!("{}", evidence::render_shown(&shown));
+            } else {
+                let shown = store::show(&repository, &arguments.id)?;
+                print_shown_entry(&shown);
+            }
             Ok(())
         }
         Command::Search(arguments) => {
@@ -1639,8 +1663,11 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
         }
         Command::Rebuild => {
             let repository = repository::discover(current_dir)?;
-            let count = reconcile::rebuild(&repository)?;
-            println!("Rebuilt SQLite from {count} managed Markdown entries");
+            let rebuilt = reconcile::rebuild(&repository)?;
+            println!(
+                "Rebuilt SQLite from {} managed Markdown entries and {} Evidence records",
+                rebuilt.entries, rebuilt.evidence
+            );
             Ok(())
         }
         Command::Export(arguments) => {

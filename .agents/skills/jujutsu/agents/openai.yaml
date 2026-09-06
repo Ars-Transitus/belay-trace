@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jujutsu Version Control"
+  short_description: "Manage orchestrator jj snapshots, merges, and bookmarks"
+  default_prompt: "Use $jujutsu for root-orchestrator snapshot, history, merge, and bookmark operations. Leave Git worktrees, reviewer git -C, and worktree cleanup to their assigned layers."

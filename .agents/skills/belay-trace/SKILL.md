@@ -19,6 +19,7 @@ belay search --include-archived                               # include archived
 belay show <id>                                               # unique prefix or slug; full entry
 belay show <plan-id>#t-001                                    # one task; prefer over the whole Plan
 belay show <goal-id>#sc-001                                   # one Success Criterion
+belay show EVD-<id>                                           # exact Evidence ID or unique prefix; NDJSON
 belay archive candidates                                      # deterministic stale-history candidates
 belay add <goal|plan|decision|work|review|note> --title "<short-en-slug>"
 belay work create --task <plan-id>#t-001 --title "..." --body "..."
@@ -31,6 +32,7 @@ belay plan lint <plan-id>   # Delivery Map and task-section structure
 belay verify record --kind <test|human-approval|...> --verdict <pass|fail> \
   --source "<command-or-url>" --summary "<what passed>" --verifies <id>
 belay sync
+belay rebuild                                                 # reports managed Markdown and Evidence counts
 belay doctor        # when generated or active integration may be stale
 belay coverage      # inspect Goal coverage before release decisions
 ```
@@ -98,7 +100,14 @@ belay route apply <run-id> --approve <exact-preview-hash>
   loses the Constraints and Non-goals that make it correct, so read those too
   before acting, and read the whole entry when the work spans tasks.
 - Display IDs may be a unique prefix or slug. Ambiguous matches fail; never
-  guess. Canonical IDs are what `show` prints.
+  guess. Canonical IDs are what `show` prints. Evidence uses exact `EVD-...`
+  or a unique prefix from `.belay/evidence/*.ndjson`; slugs and fragments are
+  rejected, and SQLite need not have indexed the record yet. `belay sync`
+  indexes valid Evidence mirrors transactionally and keeps the previous index
+  if validation fails. `belay rebuild` reports managed Markdown and Evidence
+  counts separately. Herdr reviewers use runner provenance and must not treat
+  `show EVD` as a settlement gate. Task settlement and Goal coverage stay
+  separate judgments.
 - `archived` means hide from default retrieval. Use `belay archive candidates`
   then `belay status <id> archived` after judging. Do not archive a Goal or
   Plan without human confirmation. `belay doctor` stale is skill/AGENTS drift,
