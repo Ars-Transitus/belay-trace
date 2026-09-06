@@ -1,6 +1,6 @@
 [package]
 name = "belay-trace"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2024"
 rust-version = "1.87"
 description = "Local-first trace and context harness for AI-assisted software work"
