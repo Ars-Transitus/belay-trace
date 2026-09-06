@@ -5,8 +5,8 @@ type: plan
 title: context-cost-first-phase
 status: active
 created_at: 2026-09-06T13:48:28+09:00
-updated_at: 2026-09-06T13:52:31+09:00
-revision: 5
+updated_at: 2026-09-06T19:11:48+09:00
+revision: 7
 tags: []
 links:
 - relation: fulfills
@@ -40,7 +40,7 @@ metadata: {}
 ## Delivery Map
 | ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | in-progress | 再現可能なbaseline report |
+| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | in-progress | fresh recovery round authorized 2026-09-06 |
 | T-002 | SC-002 | compile重複排除と配分 | implement_high | not-started | regression testsと出力量比較 |
 | T-003 | SC-003 | focus必須情報保持 | implement_high | not-started | Unknowns/overflow CLI tests |
 | T-004 | SC-004 | 統合比較と評価記録 | implement_medium | not-started | before/after reportとfresh Evidence |
@@ -51,6 +51,8 @@ metadata: {}
 - Steps: 重複Goal、working set、多Task Plan、Unknowns、長い制約、Evidence多数、日英混在、低budgetを含むfixtureを作る。変更前revisionとbinaryを特定し固定する。出力bytes、src/markdown.rsと同じ推定tokens、必須項目の在否、事前定義した取得手順の追加コマンド回数を保存する。
 - Acceptance: 各fixtureの入力、期待必須情報、budget、取得手順、baseline revisionが明示され、再実行で同じ結果になる。実モデルtokenや料金と混同しない。
 - Verification: fixture再実行と結果一致、独立review。将来比較用baselineを固定する。
+- Blocked: Herdr runnerがagent status待ちでtimeout。保存lane w5:p5、worktree /private/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/erwin-routed/17f2e2fc15626fd2-0604552903a9。WRK-20260906T135430-001はin-progressで、差分hashとcommitがないためsettlement未達。
+- Recovery: 2026-09-06、人間が旧pane終了、旧Work abandoned、clean baseからのfresh reimplementationを承認。
 
 ## T-002
 - Objective: task指定compileとworking-set compileの同一entry再説明を除く。
