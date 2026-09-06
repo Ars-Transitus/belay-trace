@@ -1,9 +1,9 @@
 {
   "dirty": true,
-  "git_commit": "3a1180b6689da9451279dada8823dac97b2c6c67",
-  "git_commit_short": "3a1180b6689d",
-  "git_commit_time": "2026-09-06T00:05:10+09:00",
-  "installed_at": "2026-09-06T04:34:49Z",
+  "git_commit": "977d342938b02a5ac6763228d16e9f357484dc33",
+  "git_commit_short": "977d342938b0",
+  "git_commit_time": "2026-09-06T19:19:05+09:00",
+  "installed_at": "2026-09-06T11:01:07Z",
   "product": "erwin",
   "products": [
     "codex",

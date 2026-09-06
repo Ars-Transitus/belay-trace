@@ -5,8 +5,8 @@ type: plan
 title: context-cost-first-phase
 status: active
 created_at: 2026-09-06T13:48:28+09:00
-updated_at: 2026-09-06T19:12:25+09:00
-revision: 8
+updated_at: 2026-09-06T19:44:22+09:00
+revision: 9
 tags: []
 links:
 - relation: fulfills
@@ -40,7 +40,7 @@ metadata: {}
 ## Delivery Map
 | ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | in-progress | fresh recovery round authorized 2026-09-06 |
+| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | blocked | implementer rounds 2/2 timed out before settlement |
 | T-002 | SC-002 | compile重複排除と配分 | implement_high | not-started | regression testsと出力量比較 |
 | T-003 | SC-003 | focus必須情報保持 | implement_high | not-started | Unknowns/overflow CLI tests |
 | T-004 | SC-004 | 統合比較と評価記録 | implement_medium | not-started | before/after reportとfresh Evidence |
@@ -53,6 +53,7 @@ metadata: {}
 - Verification: fixture再実行と結果一致、独立review。将来比較用baselineを固定する。
 - Prior failure: Herdr runnerがagent status待ちでtimeout。保存lane w5:p5、worktree /private/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/erwin-routed/17f2e2fc15626fd2-0604552903a9。WRK-20260906T135430-001はsettlement metadataなしでabandoned。
 - Recovery: 2026-09-06、人間が旧pane終了、旧Work abandoned、clean baseからのfresh reimplementationを承認。
+- Recovery result: fresh workerはGit stage承認UIで停止し、親runnerがstatus timeout。pane w5:p6とworktree /private/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/erwin-routed/17f2e2fc15626fd2-f7e83d36c9a3を検査用に保持。implementer round budget 2/2を消費し、settlement metadataとcommitは未生成。
 
 ## T-002
 - Objective: task指定compileとworking-set compileの同一entry再説明を除く。

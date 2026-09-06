@@ -9,15 +9,3 @@ Follow `.agents/skills/erwin-taskflow/SKILL.md` as the canonical delivery contra
 The parent invokes each worker once and does not poll. Root may authorize one fresh fixer over selected findings and exact paths, followed by fresh review. Any remaining blocker, material disagreement, or new scope returns to the human. Models and reasoning efforts remain defined by routing and role files.
 
 Installed copies are consumer configuration. Change source under `agent-config/`, `agent-safety/`, and `skills/`; installation is a separate human-controlled step.
-
-<!-- belay-trace:start -->
-## belay-trace
-
-For Tier 2 and Tier 3 work, follow the repository-installed
-`.agents/skills/belay-trace/SKILL.md`. The Skill owns context retrieval, Intent Briefs,
-Delivery Maps, reconciliation, Evidence, and conflict-safe trace updates.
-
-If the Skill is unavailable, run
-`belay context compile "<task>" --format agent --budget 4000` before broad
-history reads and preserve all repository-specific human approval gates.
-<!-- belay-trace:end -->
