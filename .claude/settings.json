@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "disableBypassPermissionsMode": "disable"
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": true,
+    "network": {
+      "allowedDomains": ["*"]
+    }
+  }
+}

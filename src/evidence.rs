@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -37,6 +38,13 @@ pub struct EvidenceRecord {
 pub struct EvidenceLink {
     pub target: String,
     pub relation: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ShownEvidence {
+    pub record: EvidenceRecord,
+    pub source_path: String,
+    pub source_line: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -251,10 +259,104 @@ pub fn render_status(status: &EvidenceStatus) -> String {
     output
 }
 
+pub fn looks_like_evidence_query(query: &str) -> bool {
+    let query = query.trim();
+    let id = query.split_once('#').map(|(left, _)| left).unwrap_or(query);
+    id == "EVD" || id.starts_with("EVD-")
+}
+
+pub fn show(repository: &Repository, query: &str) -> Result<ShownEvidence, BelayError> {
+    let query = query.trim();
+    if query.is_empty() {
+        return validation("evidence reference must not be empty");
+    }
+    if query.contains('#') {
+        return validation(format!(
+            "evidence reference {query:?} must not include a fragment"
+        ));
+    }
+    let records = read_located_mirrors(repository)?;
+    resolve_shown(&records, query)
+}
+
+pub fn render_shown(shown: &ShownEvidence) -> String {
+    let record = &shown.record;
+    let detail = serde_json::to_string(&record.detail).unwrap_or_else(|_| "{}".to_owned());
+    let mut output = format!(
+        "ID: {}\nType: evidence\nSchema: {}\nKind: {}\nVerdict: {}\nCommit: {}\nCaptured: {}\nIssuer: {}\nSource: {}\nSummary: {}\nDetail: {}\nLinks:\n",
+        record.display_id,
+        record.schema_version,
+        record.kind,
+        record.verdict,
+        record.commit_sha,
+        record.captured_at,
+        record.issuer,
+        record.source,
+        record.summary,
+        detail,
+    );
+    if record.links.is_empty() {
+        output.push_str("  none\n");
+    } else {
+        for link in &record.links {
+            output.push_str(&format!("  - {} {}\n", link.relation, link.target));
+        }
+    }
+    output.push_str(&format!(
+        "Location: {}:{}\n",
+        shown.source_path, shown.source_line
+    ));
+    output
+}
+
+fn resolve_shown(records: &[ShownEvidence], query: &str) -> Result<ShownEvidence, BelayError> {
+    if let Some(exact) = records.iter().find(|item| item.record.display_id == query) {
+        return Ok(exact.clone());
+    }
+    let matches: Vec<&ShownEvidence> = records
+        .iter()
+        .filter(|item| item.record.display_id.starts_with(query))
+        .collect();
+    match matches.as_slice() {
+        [one] => Ok((*one).clone()),
+        [] => validation(format!("evidence {query} was not found")),
+        many => {
+            let ids = many
+                .iter()
+                .map(|item| item.record.display_id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            validation(format!(
+                "evidence reference {query:?} is ambiguous; matches: {ids}"
+            ))
+        }
+    }
+}
+
 pub fn rebuild_into(
     repository: &Repository,
     connection: &Connection,
     database_path: &Path,
+) -> Result<usize, BelayError> {
+    let records = read_located_mirrors(repository)?;
+    replace_index(connection, database_path, &records)?;
+    Ok(records.len())
+}
+
+pub fn reindex(repository: &Repository) -> Result<usize, BelayError> {
+    let records = read_located_mirrors(repository)?;
+    let database_path = repository.database_path();
+    let mut connection = crate::database::open(&database_path)?;
+    let transaction = crate::entry::begin_immediate(&mut connection, &database_path)?;
+    replace_index(&transaction, &database_path, &records)?;
+    transaction.commit()?;
+    Ok(records.len())
+}
+
+fn replace_index(
+    connection: &Connection,
+    database_path: &Path,
+    records: &[ShownEvidence],
 ) -> Result<(), BelayError> {
     connection
         .execute("DELETE FROM evidence_links", [])
@@ -262,8 +364,8 @@ pub fn rebuild_into(
     connection
         .execute("DELETE FROM evidence", [])
         .map_err(|source| BelayError::sqlite(database_path, source))?;
-    for record in read_mirrors(repository)? {
-        insert_record(connection, database_path, &record)?;
+    for item in records {
+        insert_record(connection, database_path, &item.record)?;
     }
     Ok(())
 }
@@ -353,7 +455,7 @@ pub fn insert_record(
     connection
         .execute(
             "
-            INSERT OR IGNORE INTO evidence(
+            INSERT INTO evidence(
                 display_id, kind, verdict, commit_sha, captured_at, source,
                 issuer, summary, detail_json
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
@@ -385,7 +487,7 @@ pub fn insert_record(
         connection
             .execute(
                 "
-                INSERT OR IGNORE INTO evidence_links(evidence_id, target, relation)
+                INSERT INTO evidence_links(evidence_id, target, relation)
                 VALUES (?1, ?2, ?3)
                 ",
                 params![internal_id, target, link.relation],
@@ -416,7 +518,7 @@ fn append_mirror(repository: &Repository, record: &EvidenceRecord) -> Result<(),
         .map_err(|source| BelayError::io("write evidence mirror", &path, source))
 }
 
-fn read_mirrors(repository: &Repository) -> Result<Vec<EvidenceRecord>, BelayError> {
+pub fn read_located_mirrors(repository: &Repository) -> Result<Vec<ShownEvidence>, BelayError> {
     let path = repository.evidence_path();
     if !path.exists() {
         return Ok(Vec::new());
@@ -435,11 +537,13 @@ fn read_mirrors(repository: &Repository) -> Result<Vec<EvidenceRecord>, BelayErr
         if file.extension().and_then(|extension| extension.to_str()) != Some("ndjson") {
             continue;
         }
+        let source_path = storage_path(repository, &file)?;
         let reader = BufReader::new(
             fs::File::open(&file)
                 .map_err(|source| BelayError::io("open evidence mirror", &file, source))?,
         );
-        for line in reader.lines() {
+        for (index, line) in reader.lines().enumerate() {
+            let source_line = index + 1;
             let line =
                 line.map_err(|source| BelayError::io("read evidence mirror", &file, source))?;
             if line.trim().is_empty() {
@@ -447,14 +551,47 @@ fn read_mirrors(repository: &Repository) -> Result<Vec<EvidenceRecord>, BelayErr
             }
             let record: EvidenceRecord =
                 serde_json::from_str(&line).map_err(|source| BelayError::Validation {
-                    message: format!("invalid evidence record in {}: {source}", file.display()),
+                    message: format!(
+                        "invalid evidence JSON in {source_path}:{source_line}: {source}"
+                    ),
                 })?;
-            validate_record(&record)?;
-            records.push(record);
+            validate_record(&record).map_err(|error| match error {
+                BelayError::Validation { message } => BelayError::Validation {
+                    message: format!(
+                        "invalid evidence record in {source_path}:{source_line}: {message}"
+                    ),
+                },
+                other => other,
+            })?;
+            records.push(ShownEvidence {
+                record,
+                source_path: source_path.clone(),
+                source_line,
+            });
         }
     }
-    records.sort_by(|left, right| left.display_id.cmp(&right.display_id));
+    let mut by_id = BTreeMap::<String, Vec<&ShownEvidence>>::new();
+    for item in &records {
+        by_id
+            .entry(item.record.display_id.clone())
+            .or_default()
+            .push(item);
+    }
+    if let Some((id, locations)) = by_id.iter().find(|(_, items)| items.len() > 1) {
+        let locations = locations
+            .iter()
+            .map(|item| format!("{}:{}", item.source_path, item.source_line))
+            .collect::<Vec<_>>()
+            .join(" and ");
+        return validation(format!("duplicate evidence ID {id} in {locations}"));
+    }
+    records.sort_by(|left, right| left.record.display_id.cmp(&right.record.display_id));
     Ok(records)
+}
+
+fn storage_path(repository: &Repository, path: &Path) -> Result<String, BelayError> {
+    let relative = path.strip_prefix(&repository.root).unwrap_or(path);
+    crate::store::path_to_storage_string(relative)
 }
 
 fn validate_record(record: &EvidenceRecord) -> Result<(), BelayError> {
@@ -537,6 +674,10 @@ fn allocate_display_id(repository: &Repository, captured_at: &str) -> Result<Str
         })?
         .format("%Y%m%dT%H%M%S")
         .to_string();
+    let mirrored: BTreeSet<String> = read_located_mirrors(repository)?
+        .into_iter()
+        .map(|item| item.record.display_id)
+        .collect();
     let database_path = repository.database_path();
     let connection = crate::database::open_read_only(&database_path)?;
     for sequence in 1..=999 {
@@ -549,7 +690,7 @@ fn allocate_display_id(repository: &Repository, captured_at: &str) -> Result<Str
             )
             .optional()
             .map_err(|source| BelayError::sqlite(&database_path, source))?;
-        if exists.is_none() {
+        if exists.is_none() && !mirrored.contains(&candidate) {
             return Ok(candidate);
         }
     }
@@ -824,5 +965,196 @@ mod tests {
             ),
             Freshness::Fresh
         );
+    }
+
+    fn sample_json(id: &str) -> String {
+        format!(
+            r#"{{"schema_version":1,"display_id":"{id}","kind":"test","verdict":"pass","commit_sha":"abc123def456","captured_at":"2026-09-01T12:00:00+09:00","source":"cargo test","issuer":"cli-test","summary":"mirror-only record","detail":{{"fixture":true}},"links":[{{"target":"GOAL-20260901T120000-001-example","relation":"verifies"}}]}}"#
+        )
+    }
+
+    fn mirror_repo() -> (tempfile::TempDir, Repository) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join(".belay/evidence")).expect("evidence dir");
+        let repository = Repository {
+            root: dir.path().to_path_buf(),
+            belay_dir: dir.path().join(".belay"),
+            config: Config::default(),
+        };
+        (dir, repository)
+    }
+
+    #[test]
+    fn evidence_query_shape_is_prefix_based_and_ignores_entry_ids() {
+        assert!(looks_like_evidence_query("EVD"));
+        assert!(looks_like_evidence_query("EVD-20260901T120000-001"));
+        assert!(looks_like_evidence_query("EVD-20260901T120000-001#sc-001"));
+        assert!(!looks_like_evidence_query(
+            "DEC-20260901T120000-001-use-sqlite"
+        ));
+        assert!(!looks_like_evidence_query("retrieval-hygiene-archive"));
+        assert!(!looks_like_evidence_query("evd-20260901T120000-001"));
+    }
+
+    #[test]
+    fn show_resolves_exact_id_from_ndjson_without_sqlite() {
+        let (_dir, repository) = mirror_repo();
+        let id = "EVD-20260901T120000-001";
+        std::fs::write(
+            repository.evidence_path().join("2026-09.ndjson"),
+            format!("{}\n", sample_json(id)),
+        )
+        .expect("write mirror");
+
+        let shown = show(&repository, id).expect("show exact evidence");
+        assert_eq!(shown.record.display_id, id);
+        assert_eq!(shown.record.schema_version, 1);
+        assert_eq!(shown.record.kind, "test");
+        assert_eq!(shown.record.verdict, "pass");
+        assert_eq!(shown.record.commit_sha, "abc123def456");
+        assert_eq!(shown.record.captured_at, "2026-09-01T12:00:00+09:00");
+        assert_eq!(shown.record.issuer, "cli-test");
+        assert_eq!(shown.record.source, "cargo test");
+        assert_eq!(shown.record.summary, "mirror-only record");
+        assert_eq!(shown.source_line, 1);
+        assert!(
+            shown.source_path.ends_with("2026-09.ndjson"),
+            "{}",
+            shown.source_path
+        );
+
+        let rendered = render_shown(&shown);
+        for expected in [
+            "ID: EVD-20260901T120000-001",
+            "Type: evidence",
+            "Schema: 1",
+            "Kind: test",
+            "Verdict: pass",
+            "Commit: abc123def456",
+            "Captured: 2026-09-01T12:00:00+09:00",
+            "Issuer: cli-test",
+            "Source: cargo test",
+            "Summary: mirror-only record",
+            r#"Detail: {"fixture":true}"#,
+            "verifies GOAL-20260901T120000-001-example",
+            "Location:",
+        ] {
+            assert!(
+                rendered.contains(expected),
+                "missing {expected} in {rendered}"
+            );
+        }
+    }
+
+    fn write_ndjson(repository: &Repository, name: &str, lines: &[&str]) {
+        std::fs::write(
+            repository.evidence_path().join(name),
+            format!("{}\n", lines.join("\n")),
+        )
+        .expect("write ndjson");
+    }
+
+    fn show_err(repository: &Repository, query: &str) -> String {
+        show(repository, query)
+            .expect_err("show should fail")
+            .to_string()
+    }
+
+    #[test]
+    fn unique_prefix_resolves_one_evidence_record() {
+        let (_dir, repository) = mirror_repo();
+        write_ndjson(
+            &repository,
+            "2026-09.ndjson",
+            &[
+                &sample_json("EVD-20260901T120000-001"),
+                &sample_json("EVD-20260901T120100-001"),
+            ],
+        );
+        let shown = show(&repository, "EVD-20260901T120000").expect("unique prefix");
+        assert_eq!(shown.record.display_id, "EVD-20260901T120000-001");
+    }
+
+    #[test]
+    fn show_fails_closed_for_fragment_zero_ambiguous_duplicate_and_malformed() {
+        let (_dir, repository) = mirror_repo();
+        write_ndjson(
+            &repository,
+            "2026-09.ndjson",
+            &[
+                &sample_json("EVD-20260901T120000-001"),
+                &sample_json("EVD-20260901T120100-001"),
+            ],
+        );
+
+        let fragment = show_err(&repository, "EVD-20260901T120000-001#sc-001");
+        assert!(
+            fragment.contains("must not include a fragment"),
+            "{fragment}"
+        );
+
+        let missing = show_err(&repository, "EVD-20260801T000000-001");
+        assert!(missing.contains("was not found"), "{missing}");
+
+        let ambiguous = show_err(&repository, "EVD-20260901");
+        assert!(ambiguous.contains("ambiguous"), "{ambiguous}");
+        assert!(ambiguous.contains("EVD-20260901T120000-001"), "{ambiguous}");
+        assert!(ambiguous.contains("EVD-20260901T120100-001"), "{ambiguous}");
+
+        let (_dup_dir, duplicate_repo) = mirror_repo();
+        write_ndjson(
+            &duplicate_repo,
+            "2026-08.ndjson",
+            &[&sample_json("EVD-20260901T120000-001")],
+        );
+        write_ndjson(
+            &duplicate_repo,
+            "2026-09.ndjson",
+            &[&sample_json("EVD-20260901T120000-001")],
+        );
+        let duplicate = show_err(&duplicate_repo, "EVD-20260901T120000-001");
+        assert!(duplicate.contains("duplicate evidence ID"), "{duplicate}");
+        assert!(duplicate.contains("2026-08.ndjson:1"), "{duplicate}");
+        assert!(duplicate.contains("2026-09.ndjson:1"), "{duplicate}");
+
+        let cases = [
+            (r#"{"not":"json""#.to_owned(), "invalid evidence JSON"),
+            (
+                sample_json("EVD-20260901T120000-001")
+                    .replace(r#""schema_version":1"#, r#""schema_version":2"#),
+                "unsupported evidence schema 2",
+            ),
+            (
+                sample_json("EVD-20260901T120000-001")
+                    .replace(r#""kind":"test""#, r#""kind":"joke""#),
+                "unsupported evidence kind",
+            ),
+            (
+                sample_json("EVD-20260901T120000-001")
+                    .replace(r#""verdict":"pass""#, r#""verdict":"maybe""#),
+                "unsupported evidence verdict",
+            ),
+            (
+                sample_json("EVD-20260901T120000-001")
+                    .replace(r#""relation":"verifies""#, r#""relation":"implements""#),
+                "unsupported evidence relation",
+            ),
+            (
+                sample_json("EVD-20260901T120000-001").replace(
+                    r#""target":"GOAL-20260901T120000-001-example""#,
+                    r#""target":"not-an-id""#,
+                ),
+                "invalid display ID",
+            ),
+        ];
+        for (line, expected) in cases {
+            let (_case_dir, case_repo) = mirror_repo();
+            write_ndjson(&case_repo, "2026-09.ndjson", &[line.as_str()]);
+            let error = show_err(&case_repo, "EVD-20260901T120000-001");
+            assert!(
+                error.contains(expected),
+                "expected {expected:?} in {error} for {line}"
+            );
+        }
     }
 }

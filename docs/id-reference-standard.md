@@ -173,6 +173,7 @@ fragment は参照だけでなく取得にも使う。
 ```sh
 belay show PLN-20260723T120100-001-deliver-safe-sync#t-001
 belay show GOAL-20260723T120000-001-safe-sync#sc-001
+belay show EVD-20260723T120500-001
 ```
 
 fragment を付けた `show` は、定義行（Delivery Map の行、または Success
@@ -181,6 +182,12 @@ Criterion の項目）と、対応する本文セクションだけを返す。P
 
 canonical でない、存在しない、一意に解決しない fragment は、entry 全体の出力へ
 fallback せずエラーになる。要求していないものを黙って返さないためである。
+
+Evidence は fragment を持たない。`belay show EVD-...` は exact ID または一意
+prefix だけを `.belay/evidence/*.ndjson` から解決する。slug は使えない。
+SQLite 未indexでも durable record を表示できる。Herdr などの runner は自身の
+provenance を使い、`show EVD` を settlement の必須ゲートにしない。Task
+settlement と Goal coverage は別判断である。
 
 section の切り出しには `entry_chunks` を用いる。検索や context 生成と同じ
 分割規則であり、Markdown を別途解析し直すことはない。

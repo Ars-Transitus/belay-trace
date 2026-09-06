@@ -118,7 +118,12 @@ belay link \
 
 belay status DEC-20260607T090000-001-use-sqlite accepted
 belay show DEC-20260607T090000-001-use-sqlite
+belay show EVD-20260723T120500-001
 ```
+
+`belay show` also retrieves Evidence from `.belay/evidence/*.ndjson` by exact `EVD-...`
+ID or unique prefix, even before SQLite has indexed the record. Evidence slugs
+and fragments are rejected. Entry unique prefix and slug resolution is unchanged.
 
 Review Goal quality without calling an LLM:
 
@@ -226,6 +231,11 @@ belay verify status GOAL-20260607T085900-001-reliable-repository-sync
 ```
 
 Evidence is mirrored to `.belay/evidence/YYYY-MM.ndjson` and indexed in SQLite.
+`belay show EVD-...` reads the durable NDJSON record directly. `belay sync`
+indexes valid mirrors transactionally and keeps the previous Evidence index when
+validation fails. Herdr and other runners keep their own provenance; do not make
+`show EVD` a required settlement gate. Task settlement and Goal coverage remain
+separate judgments.
 Success Criterion and Delivery Map task IDs use document-local `SC-NNN` and
 `T-NNN` forms. Cross-entry references must be fully qualified, for example
 `GOAL-...#sc-001` and `PLN-...#t-001`; see the
@@ -288,14 +298,16 @@ recognition must come from the agent surface, and successful command execution
 is a third, separate observation. Report either runtime state as Unknown when
 there is no direct evidence.
 
-Rebuild SQLite and search indexes from all validated managed Markdown:
+Rebuild SQLite and search indexes from all validated managed Markdown and
+Evidence mirrors:
 
 ```sh
 belay rebuild
 ```
 
 Rebuild uses a temporary database and replaces active state only after the new
-database is complete.
+database is complete. Output reports managed Markdown counts and Evidence counts
+separately.
 
 ## Exit Status
 

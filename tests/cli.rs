@@ -112,6 +112,49 @@ fn every_command_help_has_the_required_structure() {
 }
 
 #[test]
+fn help_documents_evidence_show_and_index_contracts() {
+    let show = belay()
+        .args(["show", "--help"])
+        .output()
+        .expect("show help");
+    assert!(show.status.success());
+    let show_help = String::from_utf8(show.stdout).expect("help is UTF-8");
+    for expected in [
+        "belay show EVD-20260723T120500-001",
+        "belay show DEC-20260606T115000-001-sqlite",
+        "unique prefixes succeed",
+        "slugs and fragments are rejected",
+    ] {
+        assert!(
+            show_help.contains(expected),
+            "missing {expected} in show help"
+        );
+    }
+
+    let rebuild = belay()
+        .args(["rebuild", "--help"])
+        .output()
+        .expect("rebuild help");
+    let rebuild_help = String::from_utf8(rebuild.stdout).expect("help is UTF-8");
+    assert!(rebuild_help.contains("Evidence counts separately"));
+
+    let sync = belay()
+        .args(["sync", "--help"])
+        .output()
+        .expect("sync help");
+    let sync_help = String::from_utf8(sync.stdout).expect("help is UTF-8");
+    assert!(sync_help.contains("previous Evidence index"));
+
+    let verify = belay()
+        .args(["verify", "--help"])
+        .output()
+        .expect("verify help");
+    let verify_help = String::from_utf8(verify.stdout).expect("help is UTF-8");
+    assert!(verify_help.contains("not a required settlement gate"));
+    assert!(verify_help.contains("Task settlement and Goal coverage"));
+}
+
+#[test]
 fn doctor_help_separates_repository_state_from_runtime_observations() {
     let output = belay()
         .args(["doctor", "--help"])
@@ -581,7 +624,7 @@ fn init_reset_state_atomically_rebuilds_from_tracked_markdown() {
     assert!(
         String::from_utf8(reset.stdout)
             .expect("stdout is UTF-8")
-            .contains("Rebuilt local state from 0 Markdown entries")
+            .contains("Rebuilt local state from 0 Markdown entries and 0 Evidence records")
     );
 
     let database = Connection::open(temporary.path().join(".belay/state/belay.sqlite"))
@@ -916,6 +959,39 @@ fn created_id(output: &std::process::Output) -> String {
         .strip_prefix("Created ")
         .expect("created output")
         .to_owned()
+}
+
+fn tree_fingerprint(root: &std::path::Path) -> BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut files = BTreeMap::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path).expect("read dir") {
+            let entry = entry.expect("dir entry");
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                files.insert(
+                    path.strip_prefix(root)
+                        .expect("relative path")
+                        .to_path_buf(),
+                    fs::read(&path).expect("read file"),
+                );
+            }
+        }
+    }
+    files
+}
+
+fn write_mirror_only_evidence(root: &std::path::Path, id: &str, extra: &str) -> std::path::PathBuf {
+    let dir = root.join(".belay/evidence");
+    fs::create_dir_all(&dir).expect("create evidence dir");
+    let path = dir.join("2026-09.ndjson");
+    let record = format!(
+        r#"{{"schema_version":1,"display_id":"{id}","kind":"test","verdict":"pass","commit_sha":"abc123def456","captured_at":"2026-09-01T12:00:00+09:00","source":"cargo test","issuer":"cli-test","summary":"mirror-only record","detail":{{"fixture":true}},"links":[{{"target":"GOAL-20260901T120000-001-example","relation":"verifies"}}]}}{extra}"#
+    );
+    fs::write(&path, format!("{record}\n")).expect("write evidence mirror");
+    path
 }
 
 fn mirror_path(
@@ -5269,6 +5345,306 @@ fn show_rejects_an_ambiguous_slug() {
 }
 
 #[test]
+fn show_resolves_mirror_only_evidence_without_mutating_state() {
+    let temporary = initialize_repository();
+    let id = "EVD-20260901T120000-001";
+    write_mirror_only_evidence(temporary.path(), id, "");
+    let before = tree_fingerprint(temporary.path());
+
+    let output = belay()
+        .args(["show", id])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show mirror-only evidence");
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("stdout");
+    for expected in [
+        "ID: EVD-20260901T120000-001",
+        "Type: evidence",
+        "Schema: 1",
+        "Kind: test",
+        "Verdict: pass",
+        "Commit: abc123def456",
+        "Captured: 2026-09-01T12:00:00+09:00",
+        "Issuer: cli-test",
+        "Source: cargo test",
+        "Summary: mirror-only record",
+        r#"Detail: {"fixture":true}"#,
+        "  - verifies GOAL-20260901T120000-001-example",
+        "Location: .belay/evidence/2026-09.ndjson:1",
+    ] {
+        assert!(stdout.contains(expected), "missing {expected} in {stdout}");
+    }
+
+    assert_eq!(tree_fingerprint(temporary.path()), before);
+
+    let entry = created_id(
+        &belay()
+            .args([
+                "add",
+                "note",
+                "--title",
+                "Still an entry",
+                "--body",
+                "Entry show path must stay intact.",
+            ])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add note"),
+    );
+    let shown_entry = belay()
+        .args(["show", &entry])
+        .current_dir(temporary.path())
+        .output()
+        .expect("show entry");
+    assert!(shown_entry.status.success(), "{shown_entry:?}");
+    let entry_stdout = String::from_utf8(shown_entry.stdout).expect("entry stdout");
+    assert!(entry_stdout.contains(&format!("ID: {entry}")));
+    assert!(entry_stdout.contains("Type: note"));
+    assert!(!entry_stdout.contains("Type: evidence"));
+}
+
+#[test]
+fn show_evidence_prefix_and_error_boundaries_are_fail_closed() {
+    let temporary = initialize_repository();
+    let first = "EVD-20260901T120000-001";
+    let second = "EVD-20260901T120100-001";
+    let dir = temporary.path().join(".belay/evidence");
+    fs::create_dir_all(&dir).expect("create evidence dir");
+    let record = |id: &str| {
+        format!(
+            r#"{{"schema_version":1,"display_id":"{id}","kind":"test","verdict":"pass","commit_sha":"abc123def456","captured_at":"2026-09-01T12:00:00+09:00","source":"cargo test","issuer":"cli-test","summary":"mirror-only record","detail":{{}},"links":[{{"target":"GOAL-20260901T120000-001-example","relation":"verifies"}}]}}"#
+        )
+    };
+    fs::write(
+        dir.join("2026-09.ndjson"),
+        format!("{}\n{}\n", record(first), record(second)),
+    )
+    .expect("write two records");
+    let before = tree_fingerprint(temporary.path());
+
+    let unique = belay()
+        .args(["show", "EVD-20260901T120000"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("unique prefix");
+    assert!(unique.status.success(), "{unique:?}");
+    let unique_stdout = String::from_utf8(unique.stdout).expect("stdout");
+    assert!(
+        unique_stdout.contains(&format!("ID: {first}")),
+        "{unique_stdout}"
+    );
+    assert!(!unique_stdout.contains(second), "{unique_stdout}");
+
+    let cases: &[(&[&str], i32, &str)] = &[
+        (
+            &["show", "EVD-20260901T120000-001#sc-001"],
+            4,
+            "must not include a fragment",
+        ),
+        (&["show", "EVD-20260801T000000-001"], 4, "was not found"),
+        (&["show", "EVD-20260901"], 4, "ambiguous"),
+        (&["show", "mirror-only-record"], 4, "was not found"),
+        (&["status", first, "accepted"], 4, "was not found"),
+        (
+            &["link", first, second, "--relation", "references"],
+            4,
+            "was not found",
+        ),
+    ];
+    for (args, code, needle) in cases {
+        let output = belay()
+            .args(*args)
+            .current_dir(temporary.path())
+            .output()
+            .unwrap_or_else(|error| panic!("run {args:?}: {error}"));
+        assert_eq!(output.status.code(), Some(*code), "{args:?} {output:?}");
+        let stderr = String::from_utf8(output.stderr).expect("stderr");
+        assert!(stderr.contains(needle), "{args:?} stderr={stderr}");
+        assert_eq!(
+            tree_fingerprint(temporary.path()),
+            before,
+            "{args:?} mutated state"
+        );
+    }
+
+    fs::write(dir.join("2026-08.ndjson"), format!("{}\n", record(first)))
+        .expect("write duplicate file");
+    let duplicate = belay()
+        .args(["show", first])
+        .current_dir(temporary.path())
+        .output()
+        .expect("duplicate show");
+    assert_eq!(duplicate.status.code(), Some(4), "{duplicate:?}");
+    let duplicate_stderr = String::from_utf8(duplicate.stderr).expect("stderr");
+    assert!(
+        duplicate_stderr.contains("duplicate evidence ID"),
+        "{duplicate_stderr}"
+    );
+}
+
+#[test]
+fn sync_indexes_mirror_only_evidence_and_rebuild_reports_separate_counts() {
+    let temporary = initialize_repository();
+    let goal = created_id(
+        &belay()
+            .args(["add", "goal", "--title", "Evidence target"])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add goal"),
+    );
+    let id = "EVD-20260901T150000-001";
+    let dir = temporary.path().join(".belay/evidence");
+    fs::create_dir_all(&dir).expect("create evidence dir");
+    fs::write(
+        dir.join("2026-09.ndjson"),
+        format!(
+            r#"{{"schema_version":1,"display_id":"{id}","kind":"test","verdict":"pass","commit_sha":"abc123def456","captured_at":"2026-09-01T15:00:00+09:00","source":"cargo test","issuer":"cli-test","summary":"mirror-only record","detail":{{}},"links":[{{"target":"{goal}","relation":"verifies"}}]}}"#
+        ) + "\n",
+    )
+    .expect("write mirror-only evidence");
+
+    let database = temporary.path().join(".belay/state/belay.sqlite");
+    let count_evidence = || {
+        let connection = Connection::open(&database).expect("open database");
+        connection
+            .query_row("SELECT COUNT(*) FROM evidence", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .expect("count evidence")
+    };
+    assert_eq!(count_evidence(), 0);
+
+    let before_status = belay()
+        .args(["verify", "status", &goal])
+        .current_dir(temporary.path())
+        .output()
+        .expect("status before sync");
+    assert!(before_status.status.success(), "{before_status:?}");
+    assert!(
+        String::from_utf8(before_status.stdout)
+            .expect("stdout")
+            .contains("No evidence recorded")
+    );
+
+    let synced = belay()
+        .arg("sync")
+        .current_dir(temporary.path())
+        .output()
+        .expect("sync evidence");
+    assert!(synced.status.success(), "{synced:?}");
+    assert_eq!(count_evidence(), 1);
+
+    let after_status = belay()
+        .args(["verify", "status", &goal])
+        .current_dir(temporary.path())
+        .output()
+        .expect("status after sync");
+    assert!(after_status.status.success(), "{after_status:?}");
+    let status_stdout = String::from_utf8(after_status.stdout).expect("stdout");
+    assert!(
+        status_stdout.contains("mirror-only record"),
+        "{status_stdout}"
+    );
+
+    let rebuilt = belay()
+        .arg("rebuild")
+        .current_dir(temporary.path())
+        .output()
+        .expect("rebuild");
+    assert!(rebuilt.status.success(), "{rebuilt:?}");
+    let rebuild_stdout = String::from_utf8(rebuilt.stdout).expect("stdout");
+    assert!(
+        rebuild_stdout.contains("managed Markdown entries")
+            && rebuild_stdout.contains("Evidence records"),
+        "{rebuild_stdout}"
+    );
+    assert!(
+        rebuild_stdout.contains("1 Evidence records"),
+        "{rebuild_stdout}"
+    );
+}
+
+#[test]
+fn sync_and_rebuild_preserve_existing_evidence_index_on_invalid_mirrors() {
+    let temporary = initialize_repository();
+    let goal = created_id(
+        &belay()
+            .args(["add", "goal", "--title", "Keep evidence"])
+            .current_dir(temporary.path())
+            .output()
+            .expect("add goal"),
+    );
+    let recorded = belay()
+        .args([
+            "verify",
+            "record",
+            "--kind",
+            "test",
+            "--verdict",
+            "pass",
+            "--source",
+            "cargo test",
+            "--summary",
+            "indexed before corruption",
+            "--verifies",
+            &goal,
+        ])
+        .current_dir(temporary.path())
+        .output()
+        .expect("record evidence");
+    assert!(recorded.status.success(), "{recorded:?}");
+
+    let database = temporary.path().join(".belay/state/belay.sqlite");
+    let count_evidence = || {
+        let connection = Connection::open(&database).expect("open database");
+        connection
+            .query_row("SELECT COUNT(*) FROM evidence", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .expect("count evidence")
+    };
+    assert_eq!(count_evidence(), 1);
+
+    let evidence_dir = fs::read_dir(temporary.path().join(".belay/evidence"))
+        .expect("read evidence")
+        .next()
+        .expect("evidence file")
+        .expect("entry")
+        .path();
+    let mut existing = fs::read_to_string(&evidence_dir).expect("read mirror");
+    existing.push_str("{this is not json}\n");
+    fs::write(&evidence_dir, existing).expect("corrupt mirror");
+
+    let synced = belay()
+        .arg("sync")
+        .current_dir(temporary.path())
+        .output()
+        .expect("sync invalid evidence");
+    assert_eq!(synced.status.code(), Some(4), "{synced:?}");
+    assert_eq!(count_evidence(), 1);
+    let status = belay()
+        .args(["verify", "status", &goal])
+        .current_dir(temporary.path())
+        .output()
+        .expect("status after failed sync");
+    assert!(status.status.success(), "{status:?}");
+    assert!(
+        String::from_utf8(status.stdout)
+            .expect("stdout")
+            .contains("indexed before corruption")
+    );
+
+    let rebuilt = belay()
+        .arg("rebuild")
+        .current_dir(temporary.path())
+        .output()
+        .expect("rebuild invalid evidence");
+    assert_eq!(rebuilt.status.code(), Some(4), "{rebuilt:?}");
+    assert_eq!(count_evidence(), 1);
+}
+
+#[test]
 fn archived_entries_are_hidden_from_default_search_and_visible_with_opt_in() {
     let temporary = initialize_repository();
     let note = created_id(
@@ -5469,6 +5845,10 @@ fn generated_skill_documents_working_set_focus_and_archive_candidates() {
         "belay context compile --focus",
         "belay archive candidates",
         "Do not start implementation while Unknowns",
+        "belay show EVD-<id>",
+        "belay rebuild",
+        "Herdr reviewers use runner provenance",
+        "Task settlement and Goal coverage stay",
     ] {
         assert!(skill.contains(expected), "missing {expected} in skill");
     }
