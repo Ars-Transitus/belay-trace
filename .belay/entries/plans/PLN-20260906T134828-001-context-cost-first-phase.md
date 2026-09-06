@@ -5,8 +5,8 @@ type: plan
 title: context-cost-first-phase
 status: active
 created_at: 2026-09-06T13:48:28+09:00
-updated_at: 2026-09-06T13:50:20+09:00
-revision: 4
+updated_at: 2026-09-06T13:52:31+09:00
+revision: 5
 tags: []
 links:
 - relation: fulfills
@@ -40,7 +40,7 @@ metadata: {}
 ## Delivery Map
 | ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | not-started | 再現可能なbaseline report |
+| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | in-progress | 再現可能なbaseline report |
 | T-002 | SC-002 | compile重複排除と配分 | implement_high | not-started | regression testsと出力量比較 |
 | T-003 | SC-003 | focus必須情報保持 | implement_high | not-started | Unknowns/overflow CLI tests |
 | T-004 | SC-004 | 統合比較と評価記録 | implement_medium | not-started | before/after reportとfresh Evidence |
