@@ -3,10 +3,10 @@ schema_version: 1
 id: WRK-20260906T191437-001-context-baseline-fixture
 type: work
 title: context-baseline-fixtures
-status: in-progress
+status: completed
 created_at: 2026-09-06T19:14:37+09:00
-updated_at: 2026-09-06T19:14:37+09:00
-revision: 1
+updated_at: 2026-09-06T20:08:24+09:00
+revision: 2
 tags: []
 links:
 - relation: implements
