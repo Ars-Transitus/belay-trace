@@ -36,8 +36,12 @@ evaluation/context-cost/run-baseline.sh /path/to/belay
 The script copies the committed fixture to a temporary directory, rebuilds its
 local SQLite state from Markdown and NDJSON, writes the packet, and compares
 bytes, the `src/markdown.rs` token estimate, SHA-256, required-string presence,
-and additional-command count to `baseline.md`.
+and additional-command count to `baseline.md`. It reports the supplied binary's
+SHA-256 for provenance, but does not compare that hash: debug builds may differ
+by worktree path while producing the same pinned-revision packet.
 
 `baseline.md` identifies the source revision and binary hash used to establish
-the baseline. Re-running with a binary compiled from that revision must match.
-The script deliberately fails on any mismatch.
+the baseline. Re-running with a compatible binary compiled from that revision
+must match the packet measurements; its binary hash is retained in the run
+output for provenance. The script deliberately fails on any measurement
+mismatch.

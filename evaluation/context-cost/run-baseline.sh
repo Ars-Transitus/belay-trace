@@ -60,10 +60,15 @@ required_results=${required_results%,}
 
 actual=$(printf 'binary_sha256=%s\nbytes=%s\ntokens=%s\nsha256=%s\nrequired_present=%s/%s\nrequired_results=%s\nadditional_retrieval_commands=0\n' \
   "$binary_sha256" "$bytes" "$tokens" "$sha256" "$required_present" "$required_total" "$required_results")
-expected_values=$(awk '/^binary_sha256=|^bytes=|^tokens=|^sha256=|^required_present=|^required_results=|^additional_retrieval_commands=/' "$expected")
+# The source revision pins compiler behavior.  A debug executable hash is
+# recorded for provenance, but it is not an acceptance value: rustc embeds
+# build-path information, so an equivalent rebuild in another worktree can
+# legitimately have a different executable hash.
+expected_values=$(awk '/^bytes=|^tokens=|^sha256=|^required_present=|^required_results=|^additional_retrieval_commands=/' "$expected")
+actual_values=$(printf '%s\n' "$actual" | awk '/^bytes=|^tokens=|^sha256=|^required_present=|^required_results=|^additional_retrieval_commands=/')
 
 printf '%s\n' "$actual"
-if [ "$actual" != "$expected_values" ]; then
+if [ "$actual_values" != "$expected_values" ]; then
   echo "baseline mismatch; packet retained only until script exit" >&2
   exit 1
 fi
