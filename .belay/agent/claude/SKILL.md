@@ -1,6 +1,6 @@
 ---
 name: belay-trace
-description: Use for Tier 2 or Tier 3 coding work, or whenever a task needs project intent, plans, decisions, delivery status, review context, or trace updates through the local belay CLI. Frame an Intent Brief and Delivery Map before implementation, reconcile them during execution, and assure completion against fresh Evidence.
+description: Use for Tier 2 or Tier 3 coding work and for reading or updating Belay intent, plans, decisions, status, and Evidence through the local CLI.
 ---
 
 # belay-trace
@@ -39,40 +39,9 @@ belay coverage      # inspect Goal coverage before release decisions
 
 ## Route runs
 
-Use Route when the human asks to reconstruct one active decision thread into
-typed Assessment and Proposal artifacts. Keep semantic reasoning in the agent:
-
-```sh
-belay route start --seed <goal-or-plan-id>
-belay route template <run-id> assessment
-belay route submit <run-id> assessment --file <assessment.json>
-belay route template <run-id> proposal
-belay route submit <run-id> proposal --file <proposal.json>
-belay route template <run-id> response
-belay route submit <run-id> response --file <response.json>
-belay route preview <run-id>
-belay route pending <run-id>
-belay route apply <run-id> --approve <exact-preview-hash>
-```
-
-- Treat Route Input as the fixed source bundle and Assessment/Proposal as
-  advisory. Preserve Fact, Human Observation, Assumption, Hypothesis, Unknown,
-  Conflict, and Belay references in their typed fields.
-- Convert the human's explicit chat response into Human Response. Never infer
-  acceptance, broaden selected operation IDs, or reuse a response after the
-  Proposal hash changes.
-- After `preview`, call `pending` and present only that one returned Preview's
-  run ID, revision, and operation summary to the human. Keep its hash internal.
-  Treat ordinary-language approval as valid only when the pending Preview is
-  unique, the approval unambiguously targets it, and no later conversation
-  changes its scope. Discard the pending binding on a new Preview, changed
-  Input/Proposal/Response, an ambiguous reply, a revision request, multiple
-  pending approvals, or a material conversational detour; then re-present a
-  freshly checked Preview. `pending`/`apply` verify freshness and the exact
-  hash, but Route does not authenticate or interpret chat and does not replace
-  repository approval gates.
-- Run state under `.belay/state/route/` is local and non-authoritative. Accepted
-  materialized Belay entries are the durable source of truth.
+Use Route only when the human asks to reconstruct one active decision thread
+into typed Assessment and Proposal artifacts. Before a Route run, read
+[the Route reference](references/route.md).
 
 ## Token discipline
 
@@ -81,8 +50,10 @@ belay route apply <run-id> --approve <exact-preview-hash>
   repeated throughout later context; never use Japanese or long phrases in a
   title. Put the descriptive detail in the entry body instead.
 - Write entry bodies as terse bullets. Delete scaffold sections that would
-  only say "None." Exception: the Intent Brief's seven sections must stay
-  non-empty; write `None identified` there.
+  only say "None." Keep an Intent Brief's Problem, Desired Outcome, and
+  Success Signals; include Constraints, Non-goals, material Assumptions, and
+  Unknowns / Decisions Needed only when relevant. Goal lint is the exception:
+  every Goal keeps its six required sections.
 - Run `belay context compile` with no task to see the live working set and Next
   index, or once with a task at task start. For anything after that, use
   `belay search` or `--focus`; do not re-compile at checkpoints.
@@ -119,23 +90,23 @@ Use these compact templates when creating an unfamiliar entry. Keep only the
 sections that carry information; do not add empty placeholder sections.
 
 ```markdown
-## Goal
-
-### Desired outcome
+## Summary
 - <outcome>
 
-### Success criteria
-- SC-001: <observable result and threshold>
+## Success Criteria
+- [SC-001] <observable result and threshold>
 
-### Constraints
+## Constraints
 - <constraint>
 
-### Non-goals
+## Non-goals
 - <explicitly excluded work>
 
-### Assumptions / Unknowns
-- Assumption: <assumption>
-- Unknown: <unknown or decision needed>
+## Verification
+- <command or evidence>
+
+## Risks
+- <risk or assumption>
 ```
 
 ```markdown
@@ -147,6 +118,8 @@ sections that carry information; do not add empty placeholder sections.
 - <outcome>
 ### Success Signals
 - <observable signal>
+
+<!-- Include only when relevant. -->
 ### Constraints
 - <constraint>
 ### Non-goals
@@ -154,7 +127,7 @@ sections that carry information; do not add empty placeholder sections.
 ### Assumptions
 - <assumption, explicitly labelled>
 ### Unknowns / Decisions Needed
-- <unknown or decision>
+- <unknown or decision needed>
 
 ## Delivery Map
 | ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |
@@ -189,16 +162,16 @@ followed by typed labels as needed: `Fact`, `Human decision`, `Assumption`,
 ## Classify the work
 
 - Tier 1 is a small, reversible change with clear scope. A separate Plan is optional.
-- Tier 2 includes features and non-trivial changes. Create or update a Goal and Plan before implementation, and give the human an opportunity to correct the Intent Brief.
-- Tier 3 includes architecture, API contracts, security, migrations, and irreversible operations. Require explicit human approval of the Intent Brief and Plan before implementation.
+- Tier 2 includes features and non-trivial changes. Create or update a Goal and Plan before implementation, following the consumer repository's policy for human gates.
+- Tier 3 includes architecture, API contracts, security, migrations, and irreversible operations. Create or update a Goal and Plan before implementation, then follow consumer policy and existing authorization for any required human gates.
 - Escalate when scope, reversibility, or risk is uncertain.
 
 ## Frame
 
 1. Retrieve context per the command reference. Avoid broad reads of `.belay/entries/` unless a command identifies a specific source path.
-2. Draft an Intent Brief in the Plan with non-empty Problem, Desired Outcome, Success Signals, Constraints, Non-goals, Assumptions, and Unknowns / Decisions Needed sections.
+2. Draft an Intent Brief in the Plan with Problem, Desired Outcome, and Success Signals. Add Constraints, Non-goals, material Assumptions, and Unknowns / Decisions Needed when relevant; omit empty placeholders.
 3. Separate facts, assumptions, unknowns, and human decisions. Ask before choices that materially change the outcome, affect security or data loss, create external commitments, or are irreversible. Explicitly record and proceed with small, reversible assumptions.
-4. Do not start implementation while Unknowns / Decisions Needed still name an open choice the implementer would have to guess. Park the unknown explicitly or get a human decision. If a light pass at Frame/Map leaves Unknowns or vague Steps, stop and redo the Map rather than handing it to implementation.
+4. Do not start implementation while a relevant Unknown / Decision Needed names an open choice the implementer would have to guess. Park it explicitly or get a human decision. Continue with a recorded small, reversible assumption; if a light pass at Frame/Map leaves a material unknown or vague Steps, stop and redo the Map rather than handing it to implementation.
 
 ## Map
 
@@ -219,37 +192,25 @@ followed by typed labels as needed: `Fact`, `Human decision`, `Assumption`,
 3. Link Work and Evidence to the relevant Goal item using `fulfills` and `verifies` relations. Create a decision entry when implementation establishes a meaningful architectural, API, operational, or tradeoff decision; link a superseding decision to the old one with `supersedes` and set the old one's status to `superseded`.
 4. Reconcile after a meaningful task, a discovered requirement or risk, a scope or design change, before interruption or handoff, when the human asks for status, and before declaring completion.
 
-Use this fixed reconciliation report and make it agree with the Delivery Map:
+Keep reconciliation consistent with the Delivery Map. Report verified outcomes,
+implemented, unverified work, in-progress work, blockers, changed assumptions,
+decisions needed, and the next action when relevant. Use a brief update for a small task and
+criterion-level coverage for a multi-task delivery; omit empty categories.
 
-```text
-Current state
-- verified: <n>/<total>
-- implemented, unverified: <n>/<total>
-- in progress: <n>/<total>
-- blocked: <n>/<total>
-
-Goal coverage
-- <criterion>: <verified|partial|not started>
-
-Changed assumptions
-- <change or None identified>
-
-Human decisions needed
-- <decision or None identified>
-
-Next action
-- <single next action>
-```
+Run checks that establish the Task's Acceptance and any repository-required
+checks. Once they pass, repeat or broaden them only after relevant changes,
+new failures, a concrete unresolved concern, or a required gate. Record what
+was actually checked and leave unsupported outcomes unverified.
 
 ## Assure completion
 
-Use a fresh context that did not implement the change to review the Intent Brief, Goal, Delivery Map, actual diff, and Evidence. Do not declare the Goal complete until:
+Use independent review and final human acceptance when required by consumer repository policy or explicit Goal criteria; native sandbox and approval controls remain the authority. Never infer human acceptance. Do not declare the Goal complete until:
 
 - every Success Criterion has delivery tasks and relevant passing Evidence;
 - no `implemented`, `blocked`, or important unknown item is counted as complete;
 - the diff respects Constraints and Non-goals;
-- specification changes and dropped tasks have reasons and approval sources; and
-- the human has accepted the final outcome and that acceptance is recorded as Evidence.
+- specification changes and dropped tasks have reasons and applicable approval sources; and
+- any consumer-policy or explicit-Goal acceptance requirement is satisfied and recorded as Evidence.
 
 ## Update trace
 
