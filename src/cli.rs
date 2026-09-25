@@ -451,8 +451,9 @@ const DOCTOR_AFTER_HELP: &str = r#"Behavior and Side Effects:
 Agent Integration States:
   generated present  Canonical artifact exists; activation is not implied
   inactive           Optional repository target is absent
+  missing            Required artifact is absent; refresh with the reported init command
   active             Repository target exactly matches canonical content
-  stale              File differs; refresh it with the reported init command
+  stale              File differs or a required reference is missing; refresh it with the reported init command
   malformed          AGENTS.md marker structure is unsafe and must be repaired
 
   These are repository observations. Doctor does not claim that an agent runtime
