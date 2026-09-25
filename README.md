@@ -342,7 +342,9 @@ side effects, examples, and related commands.
   agent/
     AGENTS.md.snippet
     claude/SKILL.md
+    claude/references/route.md
     codex/SKILL.md
+    codex/references/route.md
 ```
 
 The SQLite database is local operational state and ignored by Git by default.

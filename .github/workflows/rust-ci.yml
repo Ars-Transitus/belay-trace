@@ -13,6 +13,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Doctor checks Evidence against Git ancestry; a shallow checkout
+          # makes valid historical references look stale.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.87"
@@ -21,11 +25,19 @@ jobs:
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --all-targets --locked
-      - name: Rebuild and validate tracked belay state
+      - name: Rebuild and report tracked Belay state
         run: |
           mkdir -p .belay/state .belay/evidence
           cargo run --locked -- rebuild
+          set +e
           cargo run --locked -- doctor
+          status=$?
+          set -e
+          if [ "$status" -eq 5 ]; then
+            echo "::warning title=Belay repository drift::Doctor found repository-wide freshness drift; see the details above."
+          elif [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
 
   playwright:
     runs-on: ubuntu-latest

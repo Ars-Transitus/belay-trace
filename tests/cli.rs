@@ -270,6 +270,18 @@ fn init_is_idempotent_and_does_not_modify_agents_md() {
         .expect("read generated skill");
     let claude_skill = fs::read_to_string(temporary.path().join(".belay/agent/claude/SKILL.md"))
         .expect("read generated Claude skill");
+    let codex_route = fs::read_to_string(
+        temporary
+            .path()
+            .join(".belay/agent/codex/references/route.md"),
+    )
+    .expect("read generated Codex Route reference");
+    let claude_route = fs::read_to_string(
+        temporary
+            .path()
+            .join(".belay/agent/claude/references/route.md"),
+    )
+    .expect("read generated Claude Route reference");
     assert!(snippet.contains("For Tier 2 and Tier 3 work"));
     assert!(snippet.contains("repository-installed"));
     assert!(snippet.contains("belay context compile"));
@@ -286,11 +298,18 @@ fn init_is_idempotent_and_does_not_modify_agents_md() {
     assert!(skill.contains("## Execute"));
     assert!(skill.contains("## Assure completion"));
     assert!(skill.contains("implemented, unverified"));
-    assert!(skill.contains("None identified"));
+    assert!(skill.contains("[the Route reference](references/route.md)"));
+    assert!(!skill.contains("belay route start"));
     assert!(skill.contains("Entry titles must be short English kebab-case"));
     assert!(skill.contains("Use terminal statuses"));
     assert!(claude_skill.contains("`CLAUDE.md`"));
     assert_eq!(skill, claude_skill);
+    assert!(codex_route.contains("belay route start --seed <goal-or-plan-id>"));
+    assert!(
+        codex_route
+            .contains("Treat ordinary-language approval as valid only when the pending Preview is")
+    );
+    assert_eq!(codex_route, claude_route);
 }
 
 #[test]
@@ -299,13 +318,26 @@ fn repeated_init_refreshes_generated_assets_without_activating_them() {
     let snippet_path = temporary.path().join(".belay/agent/AGENTS.md.snippet");
     let skill_path = temporary.path().join(".belay/agent/codex/SKILL.md");
     let claude_skill_path = temporary.path().join(".belay/agent/claude/SKILL.md");
+    let codex_route_path = temporary
+        .path()
+        .join(".belay/agent/codex/references/route.md");
+    let claude_route_path = temporary
+        .path()
+        .join(".belay/agent/claude/references/route.md");
     let expected_snippet = fs::read_to_string(&snippet_path).expect("read generated snippet");
     let expected_skill = fs::read_to_string(&skill_path).expect("read generated skill");
     let expected_claude_skill =
         fs::read_to_string(&claude_skill_path).expect("read generated Claude skill");
+    let expected_codex_route =
+        fs::read_to_string(&codex_route_path).expect("read generated Codex Route reference");
+    let expected_claude_route =
+        fs::read_to_string(&claude_route_path).expect("read generated Claude Route reference");
     fs::write(&snippet_path, "stale snippet\n").expect("stale generated snippet");
     fs::write(&skill_path, "stale skill\n").expect("stale generated skill");
     fs::write(&claude_skill_path, "stale Claude skill\n").expect("stale generated Claude skill");
+    fs::write(&codex_route_path, "stale Codex Route reference\n")
+        .expect("stale generated Codex Route reference");
+    fs::remove_file(&claude_route_path).expect("remove generated Claude Route reference");
 
     let refreshed = belay()
         .arg("init")
@@ -324,6 +356,14 @@ fn repeated_init_refreshes_generated_assets_without_activating_them() {
     assert_eq!(
         fs::read_to_string(claude_skill_path).expect("read refreshed Claude skill"),
         expected_claude_skill
+    );
+    assert_eq!(
+        fs::read_to_string(codex_route_path).expect("read refreshed Codex Route reference"),
+        expected_codex_route
+    );
+    assert_eq!(
+        fs::read_to_string(claude_route_path).expect("read refreshed Claude Route reference"),
+        expected_claude_route
     );
     assert!(!temporary.path().join("AGENTS.md").exists());
     assert!(!temporary.path().join(".agents").exists());
@@ -513,6 +553,18 @@ fn install_codex_skill_is_explicit_repository_scoped_and_idempotent() {
         fs::read_to_string(&path).expect("read installed skill"),
         generated
     );
+    let reference_path = temporary
+        .path()
+        .join(".agents/skills/belay-trace/references/route.md");
+    assert_eq!(
+        fs::read_to_string(&reference_path).expect("read installed Route reference"),
+        fs::read_to_string(
+            temporary
+                .path()
+                .join(".belay/agent/codex/references/route.md")
+        )
+        .expect("read generated Route reference")
+    );
 
     let repeated = belay()
         .args(["init", "--install-skill", "codex"])
@@ -524,6 +576,18 @@ fn install_codex_skill_is_explicit_repository_scoped_and_idempotent() {
         String::from_utf8(repeated.stdout)
             .expect("stdout is UTF-8")
             .contains("Codex skill unchanged")
+    );
+    fs::write(&reference_path, "stale Route reference\n").expect("stale Route reference");
+    let refreshed = belay()
+        .args(["init", "--install-skill", "codex"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("refresh Codex Route reference");
+    assert!(refreshed.status.success(), "{refreshed:?}");
+    assert!(
+        String::from_utf8(refreshed.stdout)
+            .expect("stdout is UTF-8")
+            .contains("Codex skill updated")
     );
 }
 
@@ -544,6 +608,20 @@ fn install_claude_skill_is_explicit_repository_scoped_and_idempotent() {
     assert_eq!(
         fs::read_to_string(&path).expect("read installed Claude skill"),
         generated
+    );
+    assert_eq!(
+        fs::read_to_string(
+            temporary
+                .path()
+                .join(".claude/skills/belay-trace/references/route.md"),
+        )
+        .expect("read installed Claude Route reference"),
+        fs::read_to_string(
+            temporary
+                .path()
+                .join(".belay/agent/claude/references/route.md")
+        )
+        .expect("read generated Claude Route reference")
     );
 
     let repeated = belay()
@@ -656,6 +734,10 @@ fn doctor_reports_generated_active_inactive_stale_and_missing_agent_states() {
     assert!(stdout.contains("generated Claude skill: present"));
     assert!(stdout.contains("installed Claude skill: inactive"));
     assert!(stdout.contains("belay init --install-skill claude"));
+    assert!(stdout.contains("generated Codex Route reference: present"));
+    assert!(stdout.contains("installed Codex Route reference: inactive"));
+    assert!(stdout.contains("generated Claude Route reference: present"));
+    assert!(stdout.contains("installed Claude Route reference: inactive"));
 
     let activated = belay()
         .args(["init", "--update-agents", "--install-skill", "codex"])
@@ -679,6 +761,8 @@ fn doctor_reports_generated_active_inactive_stale_and_missing_agent_states() {
     assert!(stdout.contains("AGENTS.md integration: active"));
     assert!(stdout.contains("installed Codex skill: active"));
     assert!(stdout.contains("installed Claude skill: active"));
+    assert!(stdout.contains("installed Codex Route reference: active"));
+    assert!(stdout.contains("installed Claude Route reference: active"));
     assert!(stdout.contains("runtime recognition and execution are not checked"));
 
     fs::write(
@@ -691,6 +775,19 @@ fn doctor_reports_generated_active_inactive_stale_and_missing_agent_states() {
         "stale\n",
     )
     .expect("stale installed Claude skill");
+    fs::remove_file(
+        temporary
+            .path()
+            .join(".agents/skills/belay-trace/references/route.md"),
+    )
+    .expect("remove installed Codex Route reference");
+    fs::write(
+        temporary
+            .path()
+            .join(".claude/skills/belay-trace/references/route.md"),
+        "stale\n",
+    )
+    .expect("stale installed Claude Route reference");
     fs::remove_file(temporary.path().join(".belay/agent/AGENTS.md.snippet"))
         .expect("remove generated snippet");
     let unhealthy = belay()
@@ -706,6 +803,8 @@ fn doctor_reports_generated_active_inactive_stale_and_missing_agent_states() {
     assert!(stdout.contains("run `belay init --install-skill codex`"));
     assert!(stdout.contains("installed Claude skill: stale"));
     assert!(stdout.contains("run `belay init --install-skill claude`"));
+    assert!(stdout.contains("installed Codex Route reference: stale"));
+    assert!(stdout.contains("installed Claude Route reference: stale"));
     let stderr = String::from_utf8(unhealthy.stderr).expect("stderr is UTF-8");
     assert!(stderr.contains("belay init"));
 }
@@ -841,6 +940,48 @@ fn agent_integration_rejects_symlinks_and_non_regular_files() {
     assert_eq!(install.status.code(), Some(4));
     assert!(
         fs::read_dir(&external_directory)
+            .expect("read untouched external directory")
+            .next()
+            .is_none()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn install_rejects_a_symlinked_route_reference_directory_without_writing_elsewhere() {
+    use std::os::unix::fs::symlink;
+
+    let temporary = initialize_repository();
+    let skill_path = temporary.path().join(".agents/skills/belay-trace/SKILL.md");
+    fs::create_dir_all(skill_path.parent().expect("skill parent")).expect("create skill parent");
+    fs::copy(
+        temporary.path().join(".belay/agent/codex/SKILL.md"),
+        &skill_path,
+    )
+    .expect("copy generated skill");
+    let skill_before = fs::read(&skill_path).expect("read installed skill");
+    let external = temporary.path().join("external-route-reference");
+    fs::create_dir(&external).expect("create external directory");
+    symlink(
+        &external,
+        temporary
+            .path()
+            .join(".agents/skills/belay-trace/references"),
+    )
+    .expect("symlink Route reference directory");
+
+    let install = belay()
+        .args(["init", "--install-skill", "codex"])
+        .current_dir(temporary.path())
+        .output()
+        .expect("reject symlinked Route reference directory");
+    assert_eq!(install.status.code(), Some(4));
+    assert_eq!(
+        fs::read(&skill_path).expect("read unchanged skill"),
+        skill_before
+    );
+    assert!(
+        fs::read_dir(&external)
             .expect("read untouched external directory")
             .next()
             .is_none()
@@ -5844,7 +5985,8 @@ fn generated_skill_documents_working_set_focus_and_archive_candidates() {
         "belay context compile --format agent --budget 4000",
         "belay context compile --focus",
         "belay archive candidates",
-        "Do not start implementation while Unknowns",
+        "Do not start implementation while a relevant Unknown / Decision Needed",
+        "Continue with a recorded small, reversible assumption",
         "belay show EVD-<id>",
         "belay rebuild",
         "Herdr reviewers use runner provenance",
