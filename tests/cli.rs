@@ -282,21 +282,23 @@ fn init_is_idempotent_and_does_not_modify_agents_md() {
             .join(".belay/agent/claude/references/route.md"),
     )
     .expect("read generated Claude Route reference");
-    assert!(snippet.contains("For Tier 2 and Tier 3 work"));
+    assert!(snippet.contains("For ordinary implementation, verification"));
+    assert!(snippet.contains("Write Goal and Evidence"));
     assert!(snippet.contains("repository-installed"));
     assert!(snippet.contains("belay context compile"));
     assert!(snippet.contains("human approval gates"));
     assert!(!snippet.contains("### Delivery assurance"));
     assert!(skill.contains("Repository-specific policy"));
-    assert!(skill.contains("Use for Tier 2 or Tier 3 coding work"));
+    assert!(skill.contains("Intent Briefs, Delivery Maps, and Plan lint remain optional"));
+    assert!(skill.contains("do not require Belay entries by default"));
     assert!(skill.contains("## Command reference"));
     assert!(skill.contains("## Token discipline"));
     assert!(skill.contains("belay sync\n"));
     assert!(!skill.contains("grep -v"));
-    assert!(skill.contains("## Frame"));
-    assert!(skill.contains("## Map"));
-    assert!(skill.contains("## Execute"));
-    assert!(skill.contains("## Assure completion"));
+    assert!(skill.contains("## Frame (optional for heavy work)"));
+    assert!(skill.contains("## Map (optional for heavy work)"));
+    assert!(skill.contains("## Execute (when using a Delivery Map)"));
+    assert!(skill.contains("## Assure completion (when using a Goal and Plan)"));
     assert!(skill.contains("implemented, unverified"));
     assert!(skill.contains("[the Route reference](references/route.md)"));
     assert!(!skill.contains("belay route start"));
@@ -414,9 +416,9 @@ fn update_script_refreshes_only_previously_active_integrations() {
         fs::read_to_string(temporary.path().join(".belay/agent/AGENTS.md.snippet"))
             .expect("read generated snippet");
     let agents = fs::read_to_string(temporary.path().join("AGENTS.md")).expect("read AGENTS.md");
-    assert!(generated_snippet.contains("For Tier 2 and Tier 3 work"));
+    assert!(generated_snippet.contains("Write Goal and Evidence"));
     assert!(agents.starts_with("# Project policy\n"));
-    assert!(agents.contains("For Tier 2 and Tier 3 work"));
+    assert!(agents.contains("Write Goal and Evidence"));
 
     let generated_codex = fs::read_to_string(temporary.path().join(".belay/agent/codex/SKILL.md"))
         .expect("read generated Codex skill");
@@ -843,10 +845,7 @@ fn doctor_classifies_generated_and_agents_drift_and_malformed_markers() {
     let agents_path = temporary.path().join("AGENTS.md");
     let stale_agents = fs::read_to_string(&agents_path)
         .expect("read AGENTS.md")
-        .replace(
-            "For Tier 2 and Tier 3 work",
-            "For stale Tier 2 and Tier 3 work",
-        );
+        .replace("Write Goal and Evidence", "Write stale Goal and Evidence");
     fs::write(&agents_path, stale_agents).expect("stale AGENTS integration");
     let stale = belay()
         .arg("doctor")

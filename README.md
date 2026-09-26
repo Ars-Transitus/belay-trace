@@ -59,6 +59,16 @@ make belay entries the source of truth for plans, decisions, work, and reviews.
 repository-specific instructions outside that section remain under normal human
 review.
 
+The installed AGENTS guidance asks for Goal and Evidence on heavy work: external
+or irreversible actions, protected branches, deployments, security-sensitive
+work, human approval gates, and material policy or architecture decisions.
+Ordinary implementation and reversible verification need no Belay entry by
+default. Intent Briefs, Delivery Maps, Plans, and plan lint remain available
+when richer framing helps; they are not an activation requirement. To refresh
+an existing consumer's managed section and installed Codex Skill, run
+`belay init --update-agents --install-skill codex` in that repository using the
+updated Belay binary. Text outside the markers is preserved.
+
 Agent guidance has three separate sources of truth:
 
 - repository `AGENTS.md` owns repository-specific policy, approval gates, and
