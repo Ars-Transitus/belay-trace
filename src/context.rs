@@ -170,93 +170,263 @@ pub fn compile(
     if task.trim().is_empty() {
         return compile_working_set(repository, format, budget, include_archived);
     }
-    let mut seeds = seeds.to_vec();
-    if crate::entry::looks_like_entry_id_query(task) {
-        if let Ok(resolved) = crate::store::resolve_reference(repository, task) {
-            seeds.push(resolved.display_id.clone());
-        }
+    if seeds.is_empty() && crate::entry::looks_like_entry_id_query(task) && task.contains('#') {
+        return compile_focus(repository, task, format, budget);
     }
-    let base_budget = budget.saturating_mul(6) / 10;
-    let base = generate(
+    let pool = compile_entries(repository)?;
+    let primary = search::search(
         repository,
-        task,
-        format,
-        base_budget.max(MIN_CONTEXT_BUDGET),
-        include_archived,
+        &SearchRequest {
+            query: task.into(),
+            entry_type: None,
+            status_include: vec![],
+            status_exclude: archived_exclude(include_archived),
+            tag: None,
+            display_id: None,
+            limit: PRIMARY_RESULT_LIMIT,
+        },
     )?;
-    let goals = compile_goals(repository, task, &seeds, include_archived)?;
-    let failures = compile_failures(repository)?;
-    let mut output = match format {
-        ContextFormat::Agent => format!(
-            "# Context: {}\n(compiled by belay, budget={})\n\n",
-            task.trim(),
-            budget
-        ),
-        ContextFormat::Human => format!("# Context: {}\n\nBudget: {}\n\n", task.trim(), budget),
-    };
-    output.push_str("## Goals\n");
-    if goals.is_empty() {
-        output.push_str("No directly related goals found.\n\n");
-    } else {
-        for goal in &goals {
-            output.push_str(&format!(
-                "- {} [{}]: {}\n",
-                goal.display_id, goal.status, goal.title
-            ));
-            for section in [
-                "Success Criteria",
-                "Constraints",
-                "Non-goals",
-                "Verification",
-            ] {
-                if let Some(text) = section_text(&goal.body, section) {
-                    let text = truncate_at_boundary(&text, 180);
-                    if !text.is_empty() {
-                        output.push_str(&format!("  {section}: {}\n", text.replace('\n', " ")));
+    let linked = search::linked_results(repository, &primary, LINKED_RESULT_LIMIT)?;
+    let query_scopes = primary
+        .iter()
+        .filter(|r| matches!(r.entry_type, EntryType::Goal | EntryType::Plan))
+        .map(|r| r.display_id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut scopes = BTreeSet::new();
+    let mut explicit_ids = BTreeSet::new();
+    let mut selected = BTreeMap::<String, String>::new();
+    let mut ranks = BTreeMap::<String, u32>::new();
+    for (rank, result) in primary.into_iter().chain(linked).enumerate() {
+        ranks
+            .entry(result.display_id.clone())
+            .or_insert(rank as u32 + 1);
+        selected.entry(result.display_id).or_insert(result.reason);
+    }
+    let mut seed_refs = seeds.to_vec();
+    if crate::entry::looks_like_entry_id_query(task) {
+        seed_refs.push(task.into());
+    }
+    for seed in seed_refs {
+        let reference = crate::store::resolve_reference(repository, &seed)?;
+        explicit_ids.insert(reference.display_id.clone());
+        if pool.iter().any(|e| {
+            e.display_id == reference.display_id
+                && matches!(e.entry_type, EntryType::Goal | EntryType::Plan)
+        }) {
+            scopes.insert(reference.canonical_id());
+            if reference.fragment.is_some()
+                && pool.iter().any(|e| {
+                    e.display_id == reference.display_id && e.entry_type == EntryType::Plan
+                })
+            {
+                let plan = crate::store::show(repository, &reference.canonical_id())?;
+                let goal_item = crate::trace_ids::delivery_map_rows(&plan.entry.body)
+                    .into_iter()
+                    .find(|r| Some(r.id.to_ascii_lowercase()) == reference.fragment)
+                    .and_then(|r| r.cell("Goal item").map(str::trim).map(str::to_owned));
+                if let Some(item) = goal_item {
+                    if let Some(goal) = resolve_goal_item(repository, &plan.entry, &item)? {
+                        // Select the mapped criterion, not its siblings. Whole
+                        // Goal policies still apply as ancestors of this scope.
+                        crate::store::show(repository, &goal)?;
+                        scopes.insert(goal);
                     }
                 }
             }
-            if let Ok(records) = crate::evidence::latest_for_target(repository, &goal.display_id) {
-                for record in records.into_iter().take(3) {
-                    output.push_str(&format!(
-                        "  Evidence: {} {} {} {}\n",
-                        record.verdict,
-                        record.kind,
-                        record.source,
-                        record.freshness.label()
-                    ));
+        }
+        ranks.insert(reference.display_id.clone(), 0);
+        selected.insert(reference.display_id, "explicit seed".into());
+    }
+    // Explicit Goal/Plan scopes define applicability. Query hits still rank
+    // candidates, but cannot broaden a selected Task/criterion to its siblings.
+    if scopes.is_empty() {
+        scopes = query_scopes;
+    }
+    // Carry an explicitly selected Plan's Goal; do not duplicate its ranked entry.
+    let selected_ids = selected.keys().cloned().collect::<BTreeSet<_>>();
+    for entry in pool.iter().filter(|e| selected_ids.contains(&e.display_id)) {
+        for (target, relation) in &entry.links {
+            if matches!(relation.as_str(), "fulfills" | "implements") {
+                let bare = target.split('#').next().unwrap_or(target);
+                if pool
+                    .iter()
+                    .any(|e| e.display_id == bare && e.entry_type == EntryType::Goal)
+                {
+                    selected.entry(bare.into()).or_insert_with(|| {
+                        format!("scope from {} via {relation}", entry.display_id)
+                    });
+                    if entry.entry_type == EntryType::Plan && scopes.contains(&entry.display_id) {
+                        scopes.insert(bare.into());
+                    }
                 }
             }
         }
-        output.push('\n');
     }
-    output.push_str("## Past failures\n");
-    if failures.is_empty() {
-        output.push_str("None found.\n\n");
-    } else {
-        for failure in failures {
-            output.push_str(&format!(
-                "- {} [{}]: {}\n",
-                failure.display_id, failure.status, failure.title
+    let mut evidence = ContextEvidence::load(repository)?;
+    let (summary_details, summary_warning) = match crate::summary::context_details(repository) {
+        Ok(details) => (details, None),
+        Err(error) => (
+            BTreeMap::new(),
+            Some(format!(
+                "Derived summaries unavailable; using original detail: {error}"
+            )),
+        ),
+    };
+    let mut sections = Vec::new();
+    let mut exclusions = Vec::new();
+    if let Some(warning) = summary_warning {
+        exclusions.push(warning);
+    }
+    for entry in &pool {
+        let Some(reason) = selected.get(&entry.display_id) else {
+            continue;
+        };
+        if !include_archived && entry.status == crate::entry::EntryStatus::Archived {
+            exclusions.push(format!("{}: archived", entry.display_id));
+            continue;
+        }
+        let outside_scope = entry.entry_type == EntryType::Decision
+            && !scopes.is_empty()
+            && scope_membership(entry, &pool, &scopes) == Some(false);
+        if outside_scope && !explicit_ids.contains(&entry.display_id) {
+            exclusions.push(format!(
+                "{}: outside selected scope (scope={})",
+                entry.display_id,
+                entry.scope.as_deref().unwrap_or("Unknown")
+            ));
+            continue;
+        }
+        let mut content = format!(
+            "{} [{}]: {}\nWhy: {reason}\n",
+            entry.display_id, entry.status, entry.title
+        );
+        let mut refs = vec![entry.display_id.clone()];
+        let required = matches!(entry.entry_type, EntryType::Goal | EntryType::Plan);
+        if required {
+            content.push_str(&boundary_text(
+                &entry.body,
+                entry.entry_type == EntryType::Plan,
+            ));
+            if entry.entry_type == EntryType::Goal {
+                if let Some(sc) = section_text(&entry.body, "Success Criteria") {
+                    content.push_str(&format!("\nSuccess Criteria:\n{sc}\n"));
+                }
+            }
+        } else {
+            let terms = query_terms(task);
+            if let Some((prose, sources)) = summary_details.get(&entry.display_id) {
+                content.push_str(prose);
+                refs.extend(sources.iter().cloned());
+            } else {
+                content.push_str(&optional_entry_detail(entry, &terms));
+            }
+            let boundaries = boundary_text(&entry.body, false);
+            if !boundaries.starts_with("Boundaries: Unknown") {
+                sections.push(context_section(
+                    &format!("boundary:{}", entry.display_id),
+                    "Required boundaries",
+                    true,
+                    5,
+                    vec![entry.display_id.clone()],
+                    boundaries,
+                ));
+            }
+        }
+        if entry.entry_type == EntryType::Decision {
+            let (state, decisive) = decision_state(entry, &pool, &evidence);
+            refs.extend(decisive);
+            content.push_str(&format!(
+                "Applicability: {state}; {}; scope={}; {}; freshness is separate.\n",
+                decision_reason(entry, &state, &evidence),
+                entry.scope.as_deref().unwrap_or("Unknown"),
+                if outside_scope {
+                    "outside selected scope; included only by explicit seed; current applicability Unknown"
+                } else if scopes.is_empty() || scope_membership(entry, &pool, &scopes).is_none() {
+                    "current scope applicability Unknown; human scope meaning is not inferred"
+                } else {
+                    "within selected scope; adoption does not prove current applicability"
+                }
             ));
         }
-        output.push('\n');
+        let (verification, ids) = evidence.summary(repository, &entry.display_id)?;
+        refs.extend(ids);
+        content.push_str(&format!(
+            "Evidence: {verification}; status is not verification.\n"
+        ));
+        let title = match entry.entry_type {
+            EntryType::Goal => "Goals",
+            EntryType::Plan => "Plans",
+            EntryType::Decision => "Decision",
+            EntryType::Work => "Work",
+            EntryType::Review => "Review",
+            EntryType::Note => "Note",
+        };
+        sections.push(context_section(
+            &format!("entry:{}", entry.display_id),
+            title,
+            required,
+            10 + ranks.get(&entry.display_id).copied().unwrap_or(100),
+            refs,
+            content,
+        ));
     }
-    output.push_str("## Ranked context\n\n");
-    output.push_str(&base.text);
-    output.push_str("\n## Sources\n");
-    for goal in &goals {
-        output.push_str(&format!("- {}\n", goal.display_id));
+    if sections.is_empty() {
+        sections.push(context_section(
+            "empty",
+            "Goals",
+            true,
+            10,
+            vec![],
+            "No related entries found.".into(),
+        ));
     }
-    output.push_str(&format!("- {} ranked entries\n", base.included_entries));
-    if estimate_tokens(&output) > budget {
-        output = truncate_at_boundary(&output, budget);
-    }
-    Ok(ContextBundle {
-        estimated_tokens: estimate_tokens(&output),
-        included_entries: base.included_entries + goals.len(),
-        text: output,
-    })
+    let excluded_archived = pool
+        .iter()
+        .filter(|e| e.status == crate::entry::EntryStatus::Archived && !include_archived)
+        .count();
+    sections.push(context_section("selection","Selection",true,0,vec![],format!("Related by query/link/seed; canonical IDs deduplicated. Summary context: retrieve focus for complete Task boundaries before execution. Unrelated scope excluded; archived excluded={excluded_archived}.{}",if exclusions.is_empty(){String::new()}else{format!("\n{}",exclusions.join("\n"))})));
+    bundle_sections(
+        &format!(
+            "# Context: {}\n(compiled by belay, budget={budget})",
+            task.trim()
+        ),
+        sections,
+        format,
+        budget,
+    )
+}
+
+// LC05 can replace this optional prose with a current source-bound derived
+// summary. Required boundaries, evidence/status and canonical sources are built
+// separately and cannot be displaced by that replacement.
+fn optional_entry_detail(entry: &CompileEntry, terms: &[String]) -> String {
+    let mut units = crate::markdown::generate_chunks(&entry.body)
+        .into_iter()
+        .flat_map(|chunk| evidence_units(&chunk.section, &chunk.text))
+        .collect::<Vec<_>>();
+    units.sort_by_key(|unit| {
+        (
+            !terms
+                .iter()
+                .any(|term| unit.text.to_lowercase().contains(term)),
+            unit.section.clone(),
+            unit.text.clone(),
+        )
+    });
+    let Some(unit) = units.first() else {
+        return String::new();
+    };
+    let excerpt = truncate_evidence(&unit.text, 120, terms);
+    format!(
+        "{}: {}{}\n",
+        unit.section,
+        excerpt,
+        if excerpt != unit.text {
+            " [excerpt truncated; retrieve source]"
+        } else {
+            ""
+        }
+    )
 }
 
 #[derive(Debug)]
@@ -264,136 +434,378 @@ struct CompileEntry {
     display_id: String,
     title: String,
     status: crate::entry::EntryStatus,
+    entry_type: EntryType,
     body: String,
+    scope: Option<String>,
+    links: Vec<(String, String)>,
 }
-
-fn compile_goals(
-    repository: &Repository,
-    task: &str,
-    seeds: &[String],
-    include_archived: bool,
-) -> Result<Vec<CompileEntry>, BelayError> {
-    let mut results = Vec::new();
-    for seed in seeds {
-        let shown = crate::store::show(repository, seed)?;
-        if shown.entry.entry_type == EntryType::Goal {
-            results.push(CompileEntry {
-                display_id: shown.entry.display_id,
-                title: shown.entry.title,
-                status: shown.entry.status,
-                body: shown.entry.body,
-            });
-        }
-    }
-    let search_results = search::search(
-        repository,
-        &SearchRequest {
-            query: task.to_owned(),
-            entry_type: Some(EntryType::Goal),
-            status_include: Vec::new(),
-            status_exclude: archived_exclude(include_archived),
-            tag: None,
-            display_id: None,
-            limit: 5,
-        },
-    )
-    .unwrap_or_default();
-    for result in search_results {
-        if results
-            .iter()
-            .any(|entry| entry.display_id == result.display_id)
-        {
-            continue;
-        }
-        let shown = crate::store::show(repository, &result.display_id)?;
-        results.push(CompileEntry {
-            display_id: shown.entry.display_id,
-            title: shown.entry.title,
-            status: shown.entry.status,
-            body: shown.entry.body,
+fn compile_entries(repository: &Repository) -> Result<Vec<CompileEntry>, BelayError> {
+    let path = repository.database_path();
+    let connection = crate::database::open_read_only(&path)?;
+    let mut statement=connection.prepare("SELECT display_id,title,status,type,body,metadata_json,source_path,revision,content_hash FROM entries ORDER BY display_id").map_err(|s|BelayError::sqlite(&path,s))?;
+    let rows = statement
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, String>(5)?,
+                r.get::<_, Option<String>>(6)?,
+                r.get::<_, u32>(7)?,
+                r.get::<_, String>(8)?,
+            ))
+        })
+        .map_err(|s| BelayError::sqlite(&path, s))?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(|s| BelayError::sqlite(&path, s))?;
+    let mut entries = Vec::new();
+    for (
+        display_id,
+        title,
+        status,
+        entry_type,
+        body,
+        metadata,
+        source_path,
+        revision,
+        content_hash,
+    ) in rows
+    {
+        validate_original(
+            repository,
+            &display_id,
+            source_path.as_deref(),
+            revision,
+            &content_hash,
+        )?;
+        let metadata: serde_json::Value =
+            serde_json::from_str(&metadata).map_err(|e| BelayError::Validation {
+                message: format!("invalid entry metadata for {display_id}: {e}"),
+            })?;
+        let scope = metadata
+            .get("scope")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned);
+        entries.push(CompileEntry {
+            display_id,
+            title,
+            status: status.parse()?,
+            entry_type: entry_type.parse()?,
+            body,
+            scope,
+            links: vec![],
         });
     }
-    Ok(results)
-}
-
-fn compile_failures(repository: &Repository) -> Result<Vec<CompileEntry>, BelayError> {
-    let database_path = repository.database_path();
-    let connection = crate::database::open_read_only(&database_path)?;
-    let mut statement = connection
-        .prepare(
-            "
-            SELECT id
-            FROM entries
-            WHERE (type = 'work' AND status = 'abandoned')
-               OR (type = 'decision' AND status = 'rejected')
-            ORDER BY updated_at DESC, display_id
-            LIMIT 5
-            ",
-        )
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
-    let ids = statement
-        .query_map([], |row| row.get::<_, i64>(0))
-        .map_err(|source| BelayError::sqlite(&database_path, source))?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
-    ids.into_iter()
-        .map(|id| {
-            let entry = crate::store::load_entry(&connection, &database_path, id)?;
-            Ok(CompileEntry {
-                display_id: entry.display_id,
-                title: entry.title,
-                status: entry.status,
-                body: entry.body,
-            })
+    let mut statement=connection.prepare("SELECT source.display_id,target.display_id,links.to_fragment,links.relation FROM entry_links links JOIN entries source ON source.id=links.from_entry_id JOIN entries target ON target.id=links.to_entry_id ORDER BY source.display_id,target.display_id,links.to_fragment,links.relation").map_err(|s|BelayError::sqlite(&path,s))?;
+    let rows = statement
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
         })
-        .collect()
+        .map_err(|s| BelayError::sqlite(&path, s))?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(|s| BelayError::sqlite(&path, s))?;
+    for (source, target, fragment, relation) in rows {
+        if let Some(entry) = entries.iter_mut().find(|e| e.display_id == source) {
+            entry.links.push((
+                if fragment.is_empty() {
+                    target
+                } else {
+                    format!("{target}#{fragment}")
+                },
+                relation,
+            ));
+        }
+    }
+    Ok(entries)
+}
+fn validate_original(
+    repository: &Repository,
+    id: &str,
+    source_path: Option<&str>,
+    revision: u32,
+    indexed_hash: &str,
+) -> Result<(), BelayError> {
+    let source_path = source_path.ok_or_else(|| BelayError::Validation {
+        message: format!(
+            "source binding missing for {id}; reconcile originals before compiling context"
+        ),
+    })?;
+    let path = crate::store::managed_source_path(repository, source_path)?;
+    let contents = crate::store::read_managed_file(repository, &path)?;
+    let original = crate::markdown::parse(&contents)?;
+    if original.display_id != id
+        || original.revision != revision
+        || crate::markdown::content_hash(&original)? != indexed_hash
+    {
+        return Err(BelayError::Validation {
+            message: format!(
+                "stale indexed original for {id}; revision/content hash changed; run belay sync before compiling context"
+            ),
+        });
+    }
+    Ok(())
+}
+fn validate_indexed_source(repository: &Repository, id: &str) -> Result<(), BelayError> {
+    let path = repository.database_path();
+    let connection = crate::database::open_read_only(&path)?;
+    let (source, revision, hash) = connection
+        .query_row(
+            "SELECT source_path,revision,content_hash FROM entries WHERE display_id=?1",
+            [id],
+            |r| {
+                Ok((
+                    r.get::<_, Option<String>>(0)?,
+                    r.get::<_, u32>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            },
+        )
+        .map_err(|s| BelayError::sqlite(&path, s))?;
+    validate_original(repository, id, source.as_deref(), revision, &hash)
 }
 
 fn section_text(body: &str, wanted: &str) -> Option<String> {
     heading_block(body, "## ", wanted)
 }
-
 fn subsection_text(body: &str, wanted: &str) -> Option<String> {
     heading_block(body, "### ", wanted)
 }
-
 fn heading_block(body: &str, marker: &str, wanted: &str) -> Option<String> {
-    let mut in_section = false;
+    let level = marker.chars().take_while(|c| *c == '#').count();
+    let mut active = false;
     let mut text = String::new();
     for line in body.lines() {
-        if let Some(title) = line.strip_prefix(marker) {
-            if in_section {
+        if let Some((depth, title)) = markdown_heading(line) {
+            if active && depth <= level {
                 break;
             }
-            in_section = title.trim().eq_ignore_ascii_case(wanted);
-            continue;
+            if depth == level && title.eq_ignore_ascii_case(wanted) {
+                active = true;
+                continue;
+            }
         }
-        if marker == "### " && line.starts_with("## ") && in_section {
-            break;
-        }
-        if in_section {
+        if active {
             text.push_str(line);
             text.push('\n');
         }
     }
     let text = text.trim();
-    (!text.is_empty()).then(|| text.to_owned())
+    (!text.is_empty()).then(|| text.into())
+}
+// Chunks stop at every heading. A focused Task instead owns its entire nested
+// Markdown block, bounded by the next heading at the same or a higher level.
+fn document_headings(body: &str) -> Vec<(usize, usize, usize, String)> {
+    use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
+    let mut headings = Vec::new();
+    let mut nesting = 0usize;
+    let mut heading = None;
+    for (event, range) in Parser::new_ext(body, Options::all()).into_offset_iter() {
+        match event {
+            Event::Start(Tag::Heading { level, .. }) if nesting == 0 => {
+                heading = Some((range.start, range.end, level as usize, String::new()));
+            }
+            Event::End(TagEnd::Heading(_)) if heading.is_some() => {
+                headings.push(heading.take().unwrap());
+            }
+            Event::Start(_) => nesting += 1,
+            Event::End(_) => nesting -= 1,
+            Event::Text(text) | Event::Code(text) => {
+                if let Some((_, _, _, title)) = heading.as_mut() {
+                    title.push_str(&text);
+                }
+            }
+            Event::SoftBreak | Event::HardBreak => {
+                if let Some((_, _, _, title)) = heading.as_mut() {
+                    title.push(' ');
+                }
+            }
+            _ => {}
+        }
+    }
+    headings
+}
+fn complete_task_section(body: &str, task: &str) -> Result<Option<String>, BelayError> {
+    let headings = document_headings(body);
+    let matches = headings
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, _, _, title))| title.trim().eq_ignore_ascii_case(task))
+        .collect::<Vec<_>>();
+    if matches.len() > 1 {
+        return Err(BelayError::Validation {
+            message: format!("ambiguous Task section: duplicate heading for {task}"),
+        });
+    }
+    let Some((index, (_, start, level, _))) = matches.first() else {
+        return Ok(None);
+    };
+    let end = headings
+        .iter()
+        .skip(index + 1)
+        .find(|(_, _, depth, _)| depth <= level)
+        .map_or(body.len(), |(start, _, _, _)| *start);
+    Ok(Some(body[*start..end].trim().into()))
 }
 
+// Only a canonical reference to a validated original has mechanically known
+// scope. Human labels are preserved without guessing their meaning.
+fn scope_membership(
+    entry: &CompileEntry,
+    pool: &[CompileEntry],
+    scopes: &BTreeSet<String>,
+) -> Option<bool> {
+    let reference = crate::entry::parse_entry_reference_id(entry.scope.as_deref()?).ok()?;
+    let target = pool.iter().find(|e| e.display_id == reference.display_id)?;
+    if let Some(fragment) = reference.fragment.as_deref() {
+        crate::trace_ids::fragment_definition(target.entry_type, &target.body, fragment)?;
+    }
+    Some(
+        scopes.contains(&reference.display_id)
+            || scopes.contains(&reference.canonical_id())
+            || (reference.fragment.is_none()
+                && scopes.iter().any(|scope| {
+                    scope.split_once('#').map(|(id, _)| id) == Some(reference.display_id.as_str())
+                })),
+    )
+}
+
+fn markdown_heading(line: &str) -> Option<(usize, &str)> {
+    let depth = line.chars().take_while(|c| *c == '#').count();
+    if depth == 0 || !line[depth..].starts_with(' ') {
+        return None;
+    }
+    Some((depth, line[depth..].trim()))
+}
+fn boundary_text(body: &str, plan: bool) -> String {
+    let body = if plan {
+        let task_start = document_headings(body)
+            .into_iter()
+            .find(|(_, _, _, title)| {
+                crate::trace_ids::valid_reference_fragment(
+                    EntryType::Plan,
+                    &title.trim().to_ascii_lowercase(),
+                )
+            })
+            .map_or(body.len(), |(start, _, _, _)| start);
+        &body[..task_start]
+    } else {
+        body
+    };
+    let mut output = String::new();
+    let mut active_depth = None;
+    for line in body.lines() {
+        if let Some((depth, title)) = markdown_heading(line) {
+            if plan
+                && crate::trace_ids::valid_reference_fragment(
+                    EntryType::Plan,
+                    &title.to_ascii_lowercase(),
+                )
+            {
+                break;
+            }
+            let name = title.to_ascii_lowercase().replace('-', " ");
+            let boundary = matches!(
+                name.as_str(),
+                "constraints"
+                    | "non goals"
+                    | "assumptions"
+                    | "assumptions / unknowns"
+                    | "unknowns"
+                    | "unknowns / decisions needed"
+                    | "stop"
+                    | "stops"
+                    | "stop condition"
+                    | "stop conditions"
+                    | "stopping conditions"
+            );
+            if boundary {
+                active_depth = Some(depth);
+            } else if active_depth.is_some_and(|level| depth <= level) {
+                active_depth = None;
+            }
+        }
+        let label = line
+            .trim()
+            .trim_start_matches(['-', '*', '+'])
+            .trim()
+            .replace("**", "")
+            .to_ascii_lowercase();
+        if active_depth.is_some()
+            || label.starts_with("stop:")
+            || label.starts_with("stop condition:")
+            || label.starts_with("stop conditions:")
+        {
+            output.push_str(line);
+            output.push('\n');
+        }
+    }
+    if output.is_empty() {
+        "Boundaries: Unknown (not recorded).\n".into()
+    } else {
+        output
+    }
+}
+fn unknown_text(body: &str) -> Option<String> {
+    subsection_text(body, "Unknowns / Decisions Needed")
+        .or_else(|| section_text(body, "Unknowns / Decisions Needed"))
+        .or_else(|| section_text(body, "Unknowns"))
+}
 fn archived_exclude(include_archived: bool) -> Vec<crate::entry::EntryStatus> {
     let mut exclude = Vec::new();
     crate::search::apply_default_archived_exclude(&[], &mut exclude, include_archived);
     exclude
 }
-
 fn filter_archived(results: Vec<SearchResult>, include_archived: bool) -> Vec<SearchResult> {
-    if include_archived {
-        return results;
-    }
     results
         .into_iter()
-        .filter(|result| result.status != crate::entry::EntryStatus::Archived)
+        .filter(|r| include_archived || r.status != crate::entry::EntryStatus::Archived)
         .collect()
+}
+fn context_section(
+    id: &str,
+    title: &str,
+    required: bool,
+    order: u32,
+    sources: Vec<String>,
+    content: String,
+) -> crate::context_sections::ContextSection {
+    crate::context_sections::ContextSection {
+        id: id.into(),
+        title: title.into(),
+        requirement: if required {
+            crate::context_sections::SectionRequirement::Required
+        } else {
+            crate::context_sections::SectionRequirement::Optional
+        },
+        order,
+        sources,
+        content,
+    }
+}
+fn bundle_sections(
+    header: &str,
+    sections: Vec<crate::context_sections::ContextSection>,
+    format: ContextFormat,
+    budget: usize,
+) -> Result<ContextBundle, BelayError> {
+    let rendered = crate::context_sections::render_sections(header, &sections, format, budget)
+        .map_err(|e| BelayError::Validation {
+            message: e.to_string(),
+        })?;
+    Ok(ContextBundle {
+        included_entries: rendered.source_ids.len(),
+        estimated_tokens: rendered.estimated_tokens,
+        text: rendered.text,
+    })
 }
 
 pub fn compile_working_set(
@@ -402,223 +814,175 @@ pub fn compile_working_set(
     budget: usize,
     include_archived: bool,
 ) -> Result<ContextBundle, BelayError> {
-    let live = live_entries(repository, include_archived)?;
-    let next = next_actions(repository, &live)?;
-    let seeds = live
+    use crate::entry::EntryStatus;
+    let pool = compile_entries(repository)?;
+    let mut evidence = ContextEvidence::load(repository)?;
+    let current = pool
         .iter()
-        .filter(|entry| entry.entry_type == EntryType::Goal)
-        .map(|entry| entry.display_id.clone())
+        .filter(|e| {
+            matches!(e.entry_type, EntryType::Goal | EntryType::Plan)
+                && (matches!(
+                    e.status,
+                    EntryStatus::Active | EntryStatus::Approved | EntryStatus::Blocked
+                ) || (e.entry_type == EntryType::Plan
+                    && e.status == EntryStatus::Draft
+                    && crate::trace_ids::delivery_map_rows(&e.body)
+                        .iter()
+                        .any(|r| {
+                            r.cell("State").is_some_and(|v| {
+                                matches!(v.trim(), "in-progress" | "not-started" | "blocked")
+                            })
+                        })))
+        })
         .collect::<Vec<_>>();
-    let goals = compile_goals(repository, "working set", &seeds, include_archived)?;
-    let failures = compile_failures(repository)?;
-    let primary_ids = live
-        .iter()
-        .map(|entry| entry.display_id.clone())
-        .collect::<Vec<_>>();
-    let ranked_task = live
-        .iter()
-        .map(|entry| entry.title.as_str())
-        .find(|title| !title.is_empty())
-        .unwrap_or("working set");
-    let base_budget = budget.saturating_mul(5) / 10;
-    let base = if live.is_empty() {
-        None
-    } else {
-        Some(generate(
-            repository,
-            ranked_task,
-            format,
-            base_budget.max(MIN_CONTEXT_BUDGET),
-            include_archived,
-        )?)
-    };
-
-    let mut output = match format {
-        ContextFormat::Agent => format!("# Working set\n(compiled by belay, budget={budget})\n\n"),
-        ContextFormat::Human => format!("# Working set\n\nBudget: {budget}\n\n"),
-    };
-    output.push_str("## Next\n");
-    if next.is_empty() {
-        output.push_str("No in-progress or not-started Delivery Map tasks in live plans.\n\n");
-    } else {
-        for item in &next {
-            output.push_str(&format!(
-                "- {} [{}] {} — belay show {}\n",
-                item.reference, item.state, item.outcome, item.reference
-            ));
+    let mut sections = Vec::new();
+    let mut current_text = String::new();
+    let mut refs = Vec::new();
+    let mut next = String::new();
+    let mut next_refs = Vec::new();
+    let mut blockers = String::new();
+    let mut blocker_refs = Vec::new();
+    for entry in &current {
+        refs.push(entry.display_id.clone());
+        let (verification, evd) = evidence.summary(repository, &entry.display_id)?;
+        refs.extend(evd);
+        current_text.push_str(&format!(
+            "- {} [{}] {}; evidence={}\n",
+            entry.display_id, entry.status, entry.entry_type, verification
+        ));
+        if entry.status == EntryStatus::Blocked {
+            blockers.push_str(&format!("- {}: blocked\n", entry.display_id));
+            blocker_refs.push(entry.display_id.clone());
         }
-        output.push('\n');
-    }
-    output.push_str("## Live entries\n");
-    if live.is_empty() {
-        output.push_str("No live entries in the working set.\n\n");
-    } else {
-        for entry in &live {
-            output.push_str(&format!(
-                "- {} [{}] {}: {}\n",
-                entry.display_id, entry.status, entry.entry_type, entry.title
-            ));
+        if let Some(unknown) = unknown_text(&entry.body) {
+            if !is_empty_marker(&unknown) {
+                blockers.push_str(&format!(
+                    "- {}: {}\n",
+                    entry.display_id,
+                    unknown.replace('\n', " ")
+                ));
+                blocker_refs.push(entry.display_id.clone());
+            }
         }
-        output.push('\n');
-    }
-    output.push_str("## Goals\n");
-    if goals.is_empty() {
-        output.push_str("No live goals found.\n\n");
-    } else {
-        for goal in &goals {
-            output.push_str(&format!(
-                "- {} [{}]: {}\n",
-                goal.display_id, goal.status, goal.title
-            ));
-            for section in ["Success Criteria", "Constraints", "Non-goals"] {
-                if let Some(text) = section_text(&goal.body, section) {
-                    let text = truncate_at_boundary(&text, 180);
-                    if !text.is_empty() {
-                        output.push_str(&format!("  {section}: {}\n", text.replace('\n', " ")));
-                    }
+        if entry.entry_type == EntryType::Plan {
+            let rows = crate::trace_ids::delivery_map_rows(&entry.body);
+            let in_progress = rows.iter().any(|r| {
+                r.cell("State")
+                    .is_some_and(|s| s.eq_ignore_ascii_case("in-progress"))
+            });
+            let mut first = false;
+            for row in rows {
+                let state = row.cell("State").unwrap_or("").trim().to_ascii_lowercase();
+                let reference = format!("{}#{}", entry.display_id, row.id.to_ascii_lowercase());
+                if state == "blocked" {
+                    blockers.push_str(&format!("- {reference}: blocked\n"));
+                    blocker_refs.push(reference.clone());
+                }
+                if state == "in-progress" || (!in_progress && !first && state == "not-started") {
+                    first = true;
+                    let outcome = row
+                        .cell("Outcome / Task")
+                        .or_else(|| row.cell("Outcome"))
+                        .or_else(|| row.cell("Task"))
+                        .unwrap_or("");
+                    let excerpt = truncate_at_boundary(outcome, 32);
+                    next.push_str(&format!("- {reference} [{state}]: {excerpt}\n"));
+                    next_refs.push(reference);
                 }
             }
         }
-        output.push('\n');
     }
-    output.push_str("## Past failures\n");
-    if failures.is_empty() {
-        output.push_str("None found.\n\n");
-    } else {
-        for failure in failures {
-            output.push_str(&format!(
-                "- {} [{}]: {}\n",
-                failure.display_id, failure.status, failure.title
-            ));
-        }
-        output.push('\n');
+    // Blocked Work records remain visible even without an active Plan.
+    for entry in pool
+        .iter()
+        .filter(|e| e.entry_type == EntryType::Work && e.status == EntryStatus::Blocked)
+    {
+        blockers.push_str(&format!(
+            "- {}: blocked — {}\n",
+            entry.display_id, entry.title
+        ));
+        blocker_refs.push(entry.display_id.clone());
     }
-    if let Some(base) = base {
-        output.push_str("## Ranked context\n\n");
-        output.push_str(&base.text);
-        output.push_str("\n## Sources\n");
-        for id in &primary_ids {
-            output.push_str(&format!("- {id}\n"));
-        }
+    if current_text.is_empty() {
+        current_text = "No active Goal/Plan.\n".into();
     }
-    if estimate_tokens(&output) > budget {
-        output = truncate_at_boundary(&output, budget);
+    current_text.push_str("Status is not Goal verification; criterion coverage: belay coverage.\n");
+    sections.push(context_section(
+        "current",
+        "Goals / Plans",
+        true,
+        0,
+        refs,
+        current_text,
+    ));
+    if next.is_empty() {
+        next = "No in-progress or not-started tasks.\n".into();
     }
-    Ok(ContextBundle {
-        estimated_tokens: estimate_tokens(&output),
-        included_entries: live.len() + goals.len(),
-        text: output,
-    })
-}
-
-struct LiveEntry {
-    display_id: String,
-    entry_type: EntryType,
-    status: crate::entry::EntryStatus,
-    title: String,
-    body: String,
-}
-
-struct NextAction {
-    reference: String,
-    state: String,
-    outcome: String,
-}
-
-fn live_entries(
-    repository: &Repository,
-    include_archived: bool,
-) -> Result<Vec<LiveEntry>, BelayError> {
-    let database_path = repository.database_path();
-    let connection = crate::database::open_read_only(&database_path)?;
-    let mut statement = connection
-        .prepare(
-            "
-            SELECT display_id, type, status, title, body
-            FROM entries
-            ORDER BY updated_at DESC, display_id
-            ",
-        )
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-            ))
-        })
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
-    let mut live = Vec::new();
-    for row in rows {
-        let (display_id, entry_type, status, title, body) =
-            row.map_err(|source| BelayError::sqlite(&database_path, source))?;
-        let entry_type = entry_type.parse::<EntryType>()?;
-        let status = status.parse::<crate::entry::EntryStatus>()?;
-        if !include_archived && status == crate::entry::EntryStatus::Archived {
+    next.push_str("Candidates only; execution authorization is Unknown. Before execution: belay context compile --focus <Task-ID>.\n");
+    sections.push(context_section("next", "Next", true, 1, next_refs, next));
+    if blockers.is_empty() {
+        blockers = "No recorded blockers/unknowns; absence is not proof of readiness.\n".into();
+    }
+    sections.push(context_section(
+        "blockers",
+        "Blockers / Unknowns",
+        true,
+        2,
+        blocker_refs,
+        blockers,
+    ));
+    let scopes = current
+        .iter()
+        .map(|e| e.display_id.clone())
+        .collect::<BTreeSet<_>>();
+    for entry in pool
+        .iter()
+        .filter(|e| e.entry_type == EntryType::Decision && e.status == EntryStatus::Accepted)
+    {
+        let membership = scope_membership(entry, &pool, &scopes);
+        let relevant = membership != Some(false)
+            && (entry.scope.is_some()
+                || entry
+                    .links
+                    .iter()
+                    .any(|(id, _)| scopes.contains(id.split('#').next().unwrap_or(id))));
+        if !relevant {
             continue;
         }
-        if entry_type.is_live_status(status) {
-            live.push(LiveEntry {
-                display_id,
-                entry_type,
-                status,
-                title,
-                body,
-            });
-        }
+        let (state, mut sources) = decision_state(entry, &pool, &evidence);
+        sources.push(entry.display_id.clone());
+        let (verification, evd) = evidence.summary(repository, &entry.display_id)?;
+        sources.extend(evd);
+        sections.push(context_section(&format!("decision:{}",entry.display_id),"Decision applicability",false,3,sources,format!("{}: {state}; {}; scope={}; evidence={verification}; {}; freshness does not establish applicability.",entry.display_id,decision_reason(entry,&state,&evidence),entry.scope.as_deref().unwrap_or("Unknown"),if membership.is_none(){"current scope applicability Unknown; human scope meaning is not inferred"}else{"within current scope; adoption does not prove current applicability"})));
     }
-    Ok(live)
-}
-
-fn next_actions(
-    repository: &Repository,
-    live: &[LiveEntry],
-) -> Result<Vec<NextAction>, BelayError> {
-    let _ = repository;
-    let mut next = Vec::new();
-    for entry in live
+    let archived = pool
         .iter()
-        .filter(|entry| entry.entry_type == EntryType::Plan)
-    {
-        let rows = crate::trace_ids::delivery_map_rows(&entry.body);
-        let mut in_progress = Vec::new();
-        let mut first_not_started = None;
-        for row in rows {
-            let state = row.cell("State").unwrap_or("").trim().to_ascii_lowercase();
-            let outcome = row
-                .cell("Outcome / Task")
-                .or_else(|| row.cell("Outcome"))
-                .or_else(|| row.cell("Task"))
-                .unwrap_or("")
-                .trim()
-                .to_owned();
-            let reference = format!("{}#{}", entry.display_id, row.id.to_ascii_lowercase());
-            if state == "in-progress" {
-                in_progress.push(NextAction {
-                    reference,
-                    state,
-                    outcome,
-                });
-            } else if state == "not-started" && first_not_started.is_none() {
-                first_not_started = Some(NextAction {
-                    reference,
-                    state,
-                    outcome,
-                });
-            }
-        }
-        if in_progress.is_empty() {
-            if let Some(item) = first_not_started {
-                next.push(item);
-            }
-        } else {
-            next.extend(in_progress);
-        }
-    }
-    Ok(next)
+        .filter(|e| e.status == EntryStatus::Archived)
+        .count();
+    sections.push(context_section("detail","Details",true,4,vec![],format!("Summary only; task boundaries omitted until focus. Inactive/unrelated history omitted; {} archived entries {}. Retrieve a known original with belay show <ID>; historical acceptance alone is not current applicability.",archived,if include_archived{"available by explicit retrieval"}else{"excluded"})));
+    bundle_sections(
+        &format!("# Working set\n(compiled by belay, budget={budget})"),
+        sections,
+        format,
+        budget,
+    )
+}
+fn is_empty_marker(text: &str) -> bool {
+    let t = text
+        .trim()
+        .trim_start_matches('-')
+        .trim()
+        .to_ascii_lowercase();
+    matches!(
+        t.as_str(),
+        "none"
+            | "none."
+            | "none identified"
+            | "none identified."
+            | "none found"
+            | "none found."
+            | "なし"
+    )
 }
 
 pub fn compile_focus(
@@ -628,137 +992,520 @@ pub fn compile_focus(
     budget: usize,
 ) -> Result<ContextBundle, BelayError> {
     let shown = crate::store::show(repository, focus)?;
+    validate_indexed_source(repository, &shown.entry.display_id)?;
     let Some(fragment) = shown.fragment.as_ref() else {
         return Err(BelayError::Validation {
-            message: "--focus requires a canonical fragment such as PLN-...#t-001".to_owned(),
+            message: "--focus requires a canonical fragment such as PLN-...#t-001".into(),
         });
     };
     let canonical = format!("{}#{}", shown.entry.display_id, fragment.fragment);
-    let constraints = subsection_text(&shown.entry.body, "Constraints")
-        .or_else(|| section_text(&shown.entry.body, "Constraints"));
-    let non_goals = subsection_text(&shown.entry.body, "Non-goals")
-        .or_else(|| section_text(&shown.entry.body, "Non-goals"));
-    let assumptions = subsection_text(&shown.entry.body, "Assumptions")
-        .or_else(|| subsection_text(&shown.entry.body, "Assumptions / Unknowns"));
-
-    let mut output = match format {
-        ContextFormat::Agent => {
-            format!("# Task packet: {canonical}\n(compiled by belay, budget={budget})\n\n")
-        }
-        ContextFormat::Human => format!("# Task packet: {canonical}\n\nBudget: {budget}\n\n"),
-    };
-    output.push_str("## Intent Brief\n");
-    for (label, text) in [
-        ("Constraints", constraints),
-        ("Non-goals", non_goals),
-        ("Assumptions", assumptions),
-    ] {
-        match text {
-            Some(text) => output.push_str(&format!("### {label}\n{text}\n\n")),
-            None => output.push_str(&format!("### {label}\nNone identified\n\n")),
-        }
-    }
-    output.push_str("## Task\n");
-    output.push_str(&format!("Definition:\n{}\n\n", fragment.definition));
-    match &fragment.section {
-        Some(section) => output.push_str(&format!("Section:\n{section}\n\n")),
-        None => output.push_str("Section: none\n\n"),
-    }
-
-    output.push_str("## Goal item\n");
-    match goal_item_for_task(&shown.entry.body, &fragment.fragment) {
-        Some(goal_item) => {
-            output.push_str(&format!("{goal_item}\n"));
-            if let Some(packet) = load_goal_item_packet(repository, &shown.entry, &goal_item)? {
-                output.push_str(&packet);
-            }
-            output.push('\n');
-        }
-        None => output.push_str("None identified\n\n"),
-    }
-
-    output.push_str("## Evidence\n");
-    let records = crate::evidence::latest_for_target(repository, &canonical).unwrap_or_default();
-    if records.is_empty() {
-        output.push_str("None found.\n");
+    let task_section = if shown.entry.entry_type == EntryType::Plan {
+        complete_task_section(&shown.entry.body, &fragment.fragment)?
     } else {
-        for record in records {
-            output.push_str(&format!(
-                "- {} {} {} {} {}\n",
-                record.display_id,
-                record.verdict,
-                record.kind,
-                record.source,
-                record.freshness.label()
+        fragment.section.clone()
+    };
+    let mut sections = vec![context_section(
+        "plan-boundaries",
+        "Intent Brief",
+        true,
+        0,
+        vec![shown.entry.display_id.clone()],
+        boundary_text(&shown.entry.body, shown.entry.entry_type == EntryType::Plan),
+    )];
+    sections.push(context_section(
+        "task",
+        "Task",
+        true,
+        1,
+        vec![canonical.clone()],
+        format!(
+            "Definition:\n{}\nSection:\n{}",
+            fragment.definition,
+            task_section
+                .as_deref()
+                .unwrap_or("Unknown (task section missing)")
+        ),
+    ));
+    if shown.entry.entry_type == EntryType::Plan {
+        let rows = crate::trace_ids::delivery_map_rows(&shown.entry.body)
+            .into_iter()
+            .filter(|r| r.id.eq_ignore_ascii_case(&fragment.fragment))
+            .collect::<Vec<_>>();
+        if rows.len() > 1 {
+            return Err(BelayError::Validation {
+                message: format!(
+                    "ambiguous Task mapping: duplicate row for {}",
+                    fragment.fragment
+                ),
+            });
+        }
+        let goal_item = rows
+            .first()
+            .and_then(|r| r.cell("Goal item").map(str::trim).map(str::to_owned));
+        if let Some(goal_item) = goal_item {
+            let reference = resolve_goal_item(repository, &shown.entry, &goal_item)?;
+            if let Some(reference) = reference {
+                let goal = crate::store::show(repository, &reference)?;
+                validate_indexed_source(repository, &goal.entry.display_id)?;
+                let goal_fragment =
+                    goal.fragment
+                        .as_ref()
+                        .ok_or_else(|| BelayError::Validation {
+                            message: "Task Goal item must identify one SC fragment".into(),
+                        })?;
+                let full = format!("{}#{}", goal.entry.display_id, goal_fragment.fragment);
+                sections.push(context_section(
+                    "goal-item",
+                    "Goal item",
+                    true,
+                    2,
+                    vec![full],
+                    format!(
+                        "Definition:\n{}\n{}",
+                        goal_fragment.definition,
+                        goal_fragment.section.as_deref().unwrap_or("")
+                    ),
+                ));
+                sections.push(context_section(
+                    "goal-boundaries",
+                    "Goal boundaries",
+                    true,
+                    3,
+                    vec![goal.entry.display_id.clone()],
+                    boundary_text(&goal.entry.body, false),
+                ));
+            } else {
+                sections.push(context_section("goal-item","Goal item",true,2,vec![],format!("{goal_item}: Unknown (no linked Goal; retrieve complete Plan before execution).")));
+            }
+        } else {
+            sections.push(context_section(
+                "goal-item",
+                "Goal item",
+                true,
+                2,
+                vec![],
+                "Unknown (no Task mapping).".into(),
             ));
         }
     }
-
-    if estimate_tokens(&output) > budget {
-        output = truncate_at_boundary(&output, budget);
-    }
-    Ok(ContextBundle {
-        estimated_tokens: estimate_tokens(&output),
-        included_entries: 1,
-        text: output,
-    })
+    let mut evidence = ContextEvidence::load(repository)?;
+    let (summary, refs) = evidence.full(repository, &canonical)?;
+    sections.push(context_section(
+        "evidence",
+        "Evidence",
+        true,
+        4,
+        refs,
+        format!(
+            "{summary}\nRecorded state does not establish verification or execution authorization."
+        ),
+    ));
+    bundle_sections(
+        &format!("# Task packet: {canonical}\n(compiled by belay, budget={budget})"),
+        sections,
+        format,
+        budget,
+    )
 }
-
-fn goal_item_for_task(body: &str, fragment: &str) -> Option<String> {
-    crate::trace_ids::delivery_map_rows(body)
-        .into_iter()
-        .find(|row| row.id.eq_ignore_ascii_case(fragment))
-        .and_then(|row| {
-            row.cell("Goal item")
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(ToOwned::to_owned)
-        })
-}
-
-fn load_goal_item_packet(
+fn resolve_goal_item(
     repository: &Repository,
     plan: &crate::entry::Entry,
-    goal_item: &str,
+    item: &str,
 ) -> Result<Option<String>, BelayError> {
-    let reference = if goal_item.contains('#') || crate::entry::looks_like_entry_id_query(goal_item)
-    {
-        goal_item.to_owned()
-    } else {
-        let Some(goal_id) = plan.links.iter().find_map(|link| {
-            (link.relation == crate::entry::LinkRelation::Fulfills
-                || link.relation == crate::entry::LinkRelation::Implements)
-                .then(|| {
-                    crate::entry::parse_entry_reference_id(&link.id)
-                        .ok()
-                        .filter(|reference| {
-                            crate::store::show(repository, &reference.display_id)
-                                .ok()
-                                .is_some_and(|shown| shown.entry.entry_type == EntryType::Goal)
-                        })
-                        .map(|reference| reference.display_id)
-                })
-                .flatten()
-        }) else {
-            return Ok(None);
-        };
-        format!(
-            "{goal_id}#{fragment}",
-            fragment = goal_item.to_ascii_lowercase()
-        )
-    };
-    let shown = crate::store::show(repository, &reference)?;
-    let mut text = format!("Resolved: {}\n", shown.entry.display_id);
-    if let Some(fragment) = shown.fragment {
-        text.push_str(&format!("Definition:\n{}\n", fragment.definition));
-        if let Some(section) = fragment.section {
-            text.push_str(&format!("Section:\n{section}\n"));
-        }
-    } else {
-        text.push_str(&shown.entry.body);
-        text.push('\n');
+    if item.contains(',') || item.split_whitespace().count() != 1 {
+        return Err(BelayError::Validation {
+            message: "Task must map to exactly one Goal criterion".into(),
+        });
     }
-    Ok(Some(text))
+    if item.contains('#') {
+        let reference = crate::store::resolve_reference(repository, item)?;
+        let shown = crate::store::show(repository, &reference.canonical_id())?;
+        if shown.entry.entry_type != EntryType::Goal {
+            return Err(BelayError::Validation {
+                message: "Task Goal item must resolve to a Goal SC".into(),
+            });
+        }
+        return Ok(Some(reference.canonical_id()));
+    }
+    if !item.to_ascii_lowercase().starts_with("sc-") {
+        return Err(BelayError::Validation {
+            message: "Task Goal item must identify one SC fragment".into(),
+        });
+    }
+    let mut goals = BTreeSet::new();
+    for link in &plan.links {
+        if matches!(
+            link.relation,
+            crate::entry::LinkRelation::Fulfills | crate::entry::LinkRelation::Implements
+        ) {
+            let reference = crate::entry::parse_entry_reference_id(&link.id)?;
+            let shown = crate::store::show(repository, &reference.display_id)?;
+            if shown.entry.entry_type == EntryType::Goal {
+                goals.insert(shown.entry.display_id);
+            }
+        }
+    }
+    if goals.len() > 1 {
+        return Err(BelayError::Validation {
+            message: "ambiguous Task mapping: Plan links to multiple Goals; qualify Goal item"
+                .into(),
+        });
+    }
+    Ok(goals
+        .into_iter()
+        .next()
+        .map(|id| format!("{id}#{}", item.to_ascii_lowercase())))
+}
+
+#[derive(Clone)]
+struct ContextEvidenceRecord {
+    id: String,
+    kind: String,
+    verdict: String,
+    source: String,
+    commit: String,
+    captured: String,
+}
+struct ContextEvidence {
+    records: BTreeMap<String, Vec<ContextEvidenceRecord>>,
+    head: Option<String>,
+    freshness: BTreeMap<(String, String), String>,
+    git_batch: Option<GitFreshness>,
+}
+impl ContextEvidence {
+    fn load(repository: &Repository) -> Result<Self, BelayError> {
+        // Original reader is pack-aware. Corruption is an error, never an empty result.
+        let originals = crate::evidence::read_located_mirrors(repository)?;
+        let mut records = BTreeMap::<String, Vec<ContextEvidenceRecord>>::new();
+        for shown in originals {
+            let r = shown.record;
+            for link in r.links.iter().filter(|l| l.relation == "verifies") {
+                records
+                    .entry(link.target.clone())
+                    .or_default()
+                    .push(ContextEvidenceRecord {
+                        id: r.display_id.clone(),
+                        kind: r.kind.clone(),
+                        verdict: r.verdict.clone(),
+                        source: r.source.clone(),
+                        commit: r.commit_sha.clone(),
+                        captured: r.captured_at.clone(),
+                    });
+            }
+        }
+        for items in records.values_mut() {
+            items.sort_by(|a, b| {
+                let time = |r: &ContextEvidenceRecord| {
+                    chrono::DateTime::parse_from_rfc3339(&r.captured)
+                        .map(|d| d.timestamp_millis())
+                        .unwrap_or(i64::MIN)
+                };
+                (time(b), &b.id).cmp(&(time(a), &a.id))
+            });
+        }
+        let head = if records.is_empty() {
+            None
+        } else {
+            crate::evidence::current_head(repository).ok()
+        };
+        let git_batch = head
+            .as_ref()
+            .and_then(|h| GitFreshness::load(repository, h, &records));
+        Ok(Self {
+            records,
+            head,
+            git_batch,
+            freshness: BTreeMap::new(),
+        })
+    }
+    fn label(&mut self, repository: &Repository, record: &ContextEvidenceRecord) -> String {
+        let key = (record.commit.clone(), record.captured.clone());
+        if let Some(label) = self.freshness.get(&key) {
+            return label.clone();
+        }
+        let value = if record.commit != "unknown" && self.head.is_some() {
+            // Reuse all timestamp validation and keep adoption independent of freshness.
+            let temporal = crate::evidence::freshness(
+                repository,
+                Some(&record.commit),
+                &record.commit,
+                &record.captured,
+            );
+            if !temporal.is_fresh() {
+                temporal
+            } else if let Some(batch) = &self.git_batch {
+                if let Some(behind) = batch.behind(&record.commit) {
+                    if behind <= repository.config.verify.stale_after_commits as usize {
+                        crate::evidence::Freshness::Fresh
+                    } else {
+                        crate::evidence::Freshness::Stale(format!("{behind} commits behind"))
+                    }
+                } else if batch.missing.contains(&record.commit) {
+                    crate::evidence::Freshness::Stale("not HEAD".into())
+                } else {
+                    crate::evidence::freshness(
+                        repository,
+                        self.head.as_deref(),
+                        &record.commit,
+                        &record.captured,
+                    )
+                }
+            } else {
+                crate::evidence::freshness(
+                    repository,
+                    self.head.as_deref(),
+                    &record.commit,
+                    &record.captured,
+                )
+            }
+        } else {
+            crate::evidence::freshness(
+                repository,
+                self.head.as_deref(),
+                &record.commit,
+                &record.captured,
+            )
+        };
+        let label = value.label();
+        self.freshness.insert(key, label.clone());
+        label
+    }
+    fn summary(
+        &mut self,
+        repository: &Repository,
+        target: &str,
+    ) -> Result<(String, Vec<String>), BelayError> {
+        let Some(record) = self.records.get(target).and_then(|rs| rs.first()).cloned() else {
+            return Ok(("missing (unverified)".into(), vec![]));
+        };
+        let freshness = self.label(repository, &record);
+        Ok((
+            format!("{} {} {freshness}", record.verdict, record.kind),
+            vec![record.id],
+        ))
+    }
+    fn full(
+        &mut self,
+        repository: &Repository,
+        target: &str,
+    ) -> Result<(String, Vec<String>), BelayError> {
+        let records = self.records.get(target).cloned().unwrap_or_default();
+        if records.is_empty() {
+            return Ok(("None found; verification Unknown.".into(), vec![]));
+        }
+        let mut text = String::new();
+        let mut refs = Vec::new();
+        for record in records {
+            let freshness = self.label(repository, &record);
+            text.push_str(&format!(
+                "- {} {} {} {} {}\n",
+                record.id, record.verdict, record.kind, record.source, freshness
+            ));
+            refs.push(record.id);
+        }
+        Ok((text, refs))
+    }
+}
+// One bounded graph read and one object probe replace per-entry git processes.
+// Incomplete/unsupported graph data falls back to the authoritative freshness API.
+struct GitFreshness {
+    parents: BTreeMap<String, Vec<String>>,
+    head_reachable: BTreeSet<String>,
+    missing: BTreeSet<String>,
+}
+impl GitFreshness {
+    fn load(
+        repository: &Repository,
+        head: &str,
+        records: &BTreeMap<String, Vec<ContextEvidenceRecord>>,
+    ) -> Option<Self> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let output = Command::new("git")
+            .args(["rev-list", "--all", "--parents", "--max-count=10000"])
+            .current_dir(&repository.root)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let mut parents = BTreeMap::new();
+        for line in String::from_utf8(output.stdout).ok()?.lines() {
+            let mut parts = line.split_whitespace();
+            parents.insert(
+                parts.next()?.to_owned(),
+                parts.map(str::to_owned).collect::<Vec<_>>(),
+            );
+        }
+        if !parents.contains_key(head)
+            || parents.values().flatten().any(|p| !parents.contains_key(p))
+        {
+            return None;
+        }
+        let commits = records
+            .values()
+            .flatten()
+            .map(|r| r.commit.clone())
+            .filter(|c| {
+                (c.len() == 40 || c.len() == 64)
+                    && c.chars().all(|x| x.is_ascii_hexdigit())
+                    && !parents.contains_key(c)
+            })
+            .collect::<BTreeSet<_>>();
+        let mut missing = BTreeSet::new();
+        if !commits.is_empty() {
+            let mut child = Command::new("git")
+                .arg("cat-file")
+                .arg("--batch-check=%(objectname) %(objecttype)")
+                .current_dir(&repository.root)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .ok()?;
+            let mut input = child.stdin.take()?;
+            let payload = commits.into_iter().collect::<Vec<_>>().join("\n") + "\n";
+            // Drain stdout while feeding stdin: large inventories must not fill
+            // both pipe buffers and block the reader/writer pair.
+            let writer = std::thread::spawn(move || input.write_all(payload.as_bytes()));
+            let output = child.wait_with_output();
+            writer.join().ok()?.ok()?;
+            let output = output.ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            for line in String::from_utf8(output.stdout).ok()?.lines() {
+                if let Some((id, kind)) = line.split_once(' ') {
+                    if kind != "commit" {
+                        missing.insert(id.into());
+                    }
+                }
+            }
+        }
+        let head_reachable = Self::reachable(&parents, head);
+        Some(Self {
+            parents,
+            head_reachable,
+            missing,
+        })
+    }
+    fn reachable(parents: &BTreeMap<String, Vec<String>>, start: &str) -> BTreeSet<String> {
+        let mut seen = BTreeSet::new();
+        let mut todo = vec![start.to_owned()];
+        while let Some(id) = todo.pop() {
+            if seen.insert(id.clone()) {
+                if let Some(ps) = parents.get(&id) {
+                    todo.extend(ps.iter().cloned());
+                }
+            }
+        }
+        seen
+    }
+    fn behind(&self, commit: &str) -> Option<usize> {
+        self.parents.contains_key(commit).then(|| {
+            self.head_reachable
+                .difference(&Self::reachable(&self.parents, commit))
+                .count()
+        })
+    }
+}
+
+fn decision_reason(entry: &CompileEntry, state: &str, evidence: &ContextEvidence) -> &'static str {
+    match state {
+        "replaced" => "accepted successor supersedes/refutes this record",
+        "conflict-candidate" => {
+            "same explicit scope among adopted decisions; semantic comparison required"
+        }
+        "explicit-scope" => "adoption recorded by human-approval Evidence",
+        _ if entry.status != crate::entry::EntryStatus::Accepted => "accepted status missing",
+        _ if entry.scope.is_none() => "scope missing",
+        _ if !evidence.records.get(&entry.display_id).is_some_and(|rs| {
+            rs.iter()
+                .any(|r| r.kind == "human-approval" && r.verdict == "pass")
+        }) =>
+        {
+            "human-approval Evidence missing"
+        }
+        _ => "applicability Unknown",
+    }
+}
+
+fn decision_state(
+    entry: &CompileEntry,
+    pool: &[CompileEntry],
+    evidence: &ContextEvidence,
+) -> (String, Vec<String>) {
+    use crate::entry::EntryStatus;
+    let mut refs = vec![];
+    for successor in pool
+        .iter()
+        .filter(|e| e.entry_type == EntryType::Decision && e.status == EntryStatus::Accepted)
+    {
+        for (target, relation) in &successor.links {
+            if target.split('#').next() == Some(entry.display_id.as_str())
+                && matches!(relation.as_str(), "supersedes" | "refutes")
+            {
+                refs.push(successor.display_id.clone());
+            }
+        }
+    }
+    if !refs.is_empty() {
+        return ("replaced".into(), refs);
+    }
+    let Some(scope) = entry.scope.as_deref() else {
+        return ("unconfirmed".into(), refs);
+    };
+    if entry.status != EntryStatus::Accepted {
+        return ("unconfirmed".into(), refs);
+    }
+    let approval = evidence.records.get(&entry.display_id).and_then(|rs| {
+        rs.iter()
+            .find(|r| r.kind == "human-approval" && r.verdict == "pass")
+    });
+    let Some(approval) = approval else {
+        return ("unconfirmed".into(), refs);
+    };
+    refs.push(approval.id.clone());
+    let conflicts = pool
+        .iter()
+        .filter(|e| {
+            e.entry_type == EntryType::Decision
+                && e.status == EntryStatus::Accepted
+                && e.display_id != entry.display_id
+                && e.scope.as_deref() == Some(scope)
+                && evidence.records.get(&e.display_id).is_some_and(|rs| {
+                    rs.iter()
+                        .any(|r| r.kind == "human-approval" && r.verdict == "pass")
+                })
+        })
+        .filter(|e| {
+            !pool.iter().any(|s| {
+                s.entry_type == EntryType::Decision
+                    && s.status == EntryStatus::Accepted
+                    && s.links.iter().any(|(id, relation)| {
+                        id.split('#').next() == Some(e.display_id.as_str())
+                            && matches!(relation.as_str(), "supersedes" | "refutes")
+                    })
+            })
+        })
+        .flat_map(|e| {
+            let approval = evidence
+                .records
+                .get(&e.display_id)
+                .and_then(|rs| {
+                    rs.iter()
+                        .find(|r| r.kind == "human-approval" && r.verdict == "pass")
+                })
+                .expect("eligible peer has adoption Evidence");
+            [e.display_id.clone(), approval.id.clone()]
+        })
+        .collect::<Vec<_>>();
+    if !conflicts.is_empty() {
+        refs.extend(conflicts);
+        ("conflict-candidate".into(), refs)
+    } else {
+        ("explicit-scope".into(), refs)
+    }
 }
 
 fn load_candidates(
@@ -1297,6 +2044,151 @@ fn truncate_at_boundary(text: &str, budget: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn git(root: &std::path::Path, args: &[&str]) -> String {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        String::from_utf8(output.stdout).unwrap().trim().into()
+    }
+    fn commit(root: &std::path::Path, text: &str) -> String {
+        std::fs::write(root.join("fixture.txt"), text).unwrap();
+        git(root, &["add", "fixture.txt"]);
+        git(root, &["commit", "-qm", text]);
+        git(root, &["rev-parse", "HEAD"])
+    }
+    #[test]
+    fn batch_freshness_matches_authoritative_counts_across_branches_and_missing_objects() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::repository::initialize(dir.path()).unwrap();
+        let mut repository = crate::repository::discover(dir.path()).unwrap();
+        repository.config.verify.stale_after_commits = 1;
+        git(dir.path(), &["init", "-q"]);
+        git(
+            dir.path(),
+            &["config", "user.email", "fixture@example.invalid"],
+        );
+        git(dir.path(), &["config", "user.name", "Fixture"]);
+        let root = commit(dir.path(), "root");
+        git(dir.path(), &["checkout", "-qb", "side"]);
+        let side = commit(dir.path(), "side");
+        git(dir.path(), &["checkout", "-qb", "primary", &root]);
+        let primary = commit(dir.path(), "primary");
+        // Keep side unmerged: behind must count head ancestors absent from side,
+        // not distance on one path or timestamp order.
+        let head = commit(dir.path(), "head");
+        let now = chrono::Utc::now().to_rfc3339();
+        let mut records = BTreeMap::new();
+        let commits = [
+            root,
+            side,
+            primary,
+            head.clone(),
+            "f".repeat(40),
+            "unknown".into(),
+            head[..8].into(),
+        ];
+        for (i, sha) in commits.iter().enumerate() {
+            records.insert(
+                format!("target-{i}"),
+                vec![ContextEvidenceRecord {
+                    id: format!("record-{i}"),
+                    kind: "test".into(),
+                    verdict: "pass".into(),
+                    source: "fixture".into(),
+                    commit: sha.clone(),
+                    captured: now.clone(),
+                }],
+            );
+        }
+        let batch = GitFreshness::load(&repository, &head, &records).unwrap();
+        let mut context = ContextEvidence {
+            records: records.clone(),
+            head: Some(head.clone()),
+            freshness: BTreeMap::new(),
+            git_batch: Some(batch),
+        };
+        for record in records.values().flatten() {
+            let expected = crate::evidence::freshness(
+                &repository,
+                Some(&head),
+                &record.commit,
+                &record.captured,
+            )
+            .label();
+            assert_eq!(
+                context.label(&repository, record),
+                expected,
+                "{}",
+                record.commit
+            );
+        }
+        for captured in ["invalid", "2099-01-01T00:00:00Z", "2020-01-01T00:00:00Z"] {
+            for sha in [&head, &"unknown".into(), &"f".repeat(40)] {
+                let record = ContextEvidenceRecord {
+                    id: "temporal".into(),
+                    kind: "test".into(),
+                    verdict: "pass".into(),
+                    source: "fixture".into(),
+                    commit: sha.clone(),
+                    captured: captured.into(),
+                };
+                assert_eq!(
+                    context.label(&repository, &record),
+                    crate::evidence::freshness(&repository, Some(&head), sha, captured).label()
+                );
+            }
+        }
+        // A shallow boundary is a root for rev-list too. Compare using a real
+        // shallow clone rather than assuming full parent history exists.
+        let shallow_dir = tempfile::tempdir().unwrap();
+        let destination = shallow_dir.path().join("clone");
+        git(
+            shallow_dir.path(),
+            &[
+                "clone",
+                "--quiet",
+                "--depth=1",
+                &format!("file://{}", dir.path().display()),
+                destination.to_str().unwrap(),
+            ],
+        );
+        crate::repository::initialize(&destination).unwrap();
+        let shallow = crate::repository::discover(&destination).unwrap();
+        let batch = GitFreshness::load(&shallow, &head, &records).unwrap();
+        let mut context = ContextEvidence {
+            records: records.clone(),
+            head: Some(head.clone()),
+            freshness: BTreeMap::new(),
+            git_batch: Some(batch),
+        };
+        for record in records.values().flatten() {
+            assert_eq!(
+                context.label(&shallow, record),
+                crate::evidence::freshness(&shallow, Some(&head), &record.commit, &record.captured)
+                    .label()
+            );
+        }
+        let unavailable = tempfile::tempdir().unwrap();
+        crate::repository::initialize(unavailable.path()).unwrap();
+        let unavailable = crate::repository::discover(unavailable.path()).unwrap();
+        let mut context = ContextEvidence {
+            records: records.clone(),
+            head: None,
+            freshness: BTreeMap::new(),
+            git_batch: None,
+        };
+        for record in records.values().flatten() {
+            assert_eq!(
+                context.label(&unavailable, record),
+                crate::evidence::freshness(&unavailable, None, &record.commit, &record.captured)
+                    .label()
+            );
+        }
+    }
 
     #[test]
     fn evidence_units_preserve_lists_and_sentence_boundaries() {

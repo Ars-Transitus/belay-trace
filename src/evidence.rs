@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 use chrono::{DateTime, Local, SecondsFormat, Utc};
@@ -60,6 +59,24 @@ pub struct RecordInput {
     pub verifies: Vec<String>,
 }
 
+/// Raw original is durable even when its derived index could not be updated.
+#[derive(Debug, Clone)]
+pub struct RecordedEvidence {
+    pub record: EvidenceRecord,
+    pub index_error: Option<String>,
+}
+impl std::ops::Deref for RecordedEvidence {
+    type Target = EvidenceRecord;
+    fn deref(&self) -> &EvidenceRecord {
+        &self.record
+    }
+}
+impl RecordedEvidence {
+    pub fn indexed(&self) -> bool {
+        self.index_error.is_none()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct EvidenceStatus {
     pub target: String,
@@ -99,7 +116,8 @@ impl Freshness {
     }
 }
 
-pub fn record(repository: &Repository, input: RecordInput) -> Result<EvidenceRecord, BelayError> {
+pub fn record(repository: &Repository, input: RecordInput) -> Result<RecordedEvidence, BelayError> {
+    let _guard = crate::lifecycle::writer_lock(repository)?;
     validate_kind(&input.kind)?;
     validate_verdict(&input.verdict)?;
     if input.verifies.is_empty() {
@@ -142,18 +160,49 @@ pub fn record(repository: &Repository, input: RecordInput) -> Result<EvidenceRec
             })
             .collect(),
     };
-    append_mirror(repository, &record)?;
+    validate_record(&record)?;
+    crate::lifecycle::ensure_v2(repository)?;
+    if let Err(error) = append_mirror(repository, &record) {
+        let path = repository
+            .evidence_path()
+            .join("records")
+            .join(format!("{}.json", record.display_id));
+        if path.try_exists().unwrap_or(false) {
+            return Err(BelayError::StorageSummary {
+                message: format!(
+                    "Evidence {} publication exists at {}, but durability is unconfirmed: {error}. Inspect this ID and run sync; do not blindly resend.",
+                    record.display_id,
+                    path.display()
+                ),
+            });
+        }
+        return Err(error);
+    }
     let database_path = repository.database_path();
-    let connection = crate::database::open(&database_path)?;
-    insert_record(&connection, &database_path, &record)?;
-    Ok(record)
+    let indexed = (|| {
+        if !database_path
+            .try_exists()
+            .map_err(|e| BelayError::io("inspect Evidence index", &database_path, e))?
+        {
+            return validation("Evidence index is unavailable; rebuild from originals");
+        }
+        let mut connection = crate::database::open(&database_path)?;
+        let transaction = crate::entry::begin_immediate(&mut connection, &database_path)?;
+        insert_record(&transaction, &database_path, &record)?;
+        transaction.commit()?;
+        Ok::<_, BelayError>(())
+    })();
+    Ok(RecordedEvidence {
+        record,
+        index_error: indexed.err().map(|e| e.to_string()),
+    })
 }
 
 pub fn import_junit(
     repository: &Repository,
     path: &Path,
     verifies: Vec<String>,
-) -> Result<EvidenceRecord, BelayError> {
+) -> Result<RecordedEvidence, BelayError> {
     let contents = fs::read_to_string(path)
         .map_err(|source| BelayError::io("read JUnit XML", path, source))?;
     let failures = count_attr(&contents, "failures") + count_attr(&contents, "errors");
@@ -180,53 +229,32 @@ pub fn import_junit(
 pub fn status(repository: &Repository, target: &str) -> Result<EvidenceStatus, BelayError> {
     let target = crate::store::resolve_reference(repository, target)?.canonical_id();
     validate_target(repository, &target)?;
-    let database_path = repository.database_path();
-    let connection = crate::database::open_read_only(&database_path)?;
-    let mut statement = connection
-        .prepare(
-            "
-            SELECT evidence.display_id, evidence.kind, evidence.verdict, evidence.source,
-                   evidence.captured_at, evidence.commit_sha, evidence.summary
-            FROM evidence_links links
-            JOIN evidence ON evidence.id = links.evidence_id
-            WHERE links.target = ?1
-            ORDER BY julianday(evidence.captured_at) DESC, evidence.display_id DESC
-            ",
-        )
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
     let head = current_head(repository).ok();
-    let rows = statement
-        .query_map([target.as_str()], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-            ))
-        })
-        .map_err(|source| BelayError::sqlite(&database_path, source))?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|source| BelayError::sqlite(&database_path, source))?;
-    let records = rows
+    let mut originals = read_located_mirrors(repository)?;
+    originals.retain(|shown| shown.record.links.iter().any(|l| l.target == target));
+    originals.sort_by(|a, b| {
+        let left = DateTime::parse_from_rfc3339(&a.record.captured_at).ok();
+        let right = DateTime::parse_from_rfc3339(&b.record.captured_at).ok();
+        right
+            .cmp(&left)
+            .then_with(|| b.record.display_id.cmp(&a.record.display_id))
+    });
+    let records = originals
         .into_iter()
-        .map(
-            |(display_id, kind, verdict, source, captured_at, commit_sha, summary)| {
-                let freshness = freshness(repository, head.as_deref(), &commit_sha, &captured_at);
-                EvidenceStatusRecord {
-                    display_id,
-                    kind,
-                    verdict,
-                    source,
-                    captured_at,
-                    freshness,
-                    commit_sha,
-                    summary,
-                }
-            },
-        )
+        .map(|shown| {
+            let r = shown.record;
+            let freshness = freshness(repository, head.as_deref(), &r.commit_sha, &r.captured_at);
+            EvidenceStatusRecord {
+                display_id: r.display_id,
+                kind: r.kind,
+                verdict: r.verdict,
+                source: r.source,
+                captured_at: r.captured_at,
+                commit_sha: r.commit_sha,
+                summary: r.summary,
+                freshness,
+            }
+        })
         .collect();
     Ok(EvidenceStatus { target, records })
 }
@@ -344,6 +372,7 @@ pub fn rebuild_into(
 }
 
 pub fn reindex(repository: &Repository) -> Result<usize, BelayError> {
+    let _guard = crate::lifecycle::writer_lock(repository)?;
     let records = read_located_mirrors(repository)?;
     let database_path = repository.database_path();
     let mut connection = crate::database::open(&database_path)?;
@@ -351,6 +380,85 @@ pub fn reindex(repository: &Repository) -> Result<usize, BelayError> {
     replace_index(&transaction, &database_path, &records)?;
     transaction.commit()?;
     Ok(records.len())
+}
+
+/// Verification consumers must not rely on a stale or incomplete derived index.
+pub fn validate_index_sources(repository: &Repository) -> Result<(), BelayError> {
+    let originals = read_located_mirrors(repository)?;
+    let path = repository.database_path();
+    let connection = crate::database::open_read_only(&path)?;
+    let count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM evidence", [], |r| r.get(0))
+        .map_err(|e| BelayError::sqlite(&path, e))?;
+    if count != originals.len() as i64 {
+        return Err(BelayError::Conflict {
+            message: format!(
+                "Evidence originals/index drift: {} originals, {count} indexed; run belay sync",
+                originals.len()
+            ),
+        });
+    }
+    for shown in originals {
+        let r = shown.record;
+        type IndexedFields = (
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+        );
+        let indexed:Option<IndexedFields> = connection.query_row(
+            "SELECT kind,verdict,commit_sha,captured_at,source,issuer,summary,detail_json FROM evidence WHERE display_id=?1",
+            [&r.display_id], |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?,row.get(6)?,row.get(7)?))
+        ).optional().map_err(|e|BelayError::sqlite(&path,e))?;
+        let Some((kind, verdict, commit, captured, source, issuer, summary, detail)) = indexed
+        else {
+            return Err(BelayError::Conflict {
+                message: format!(
+                    "saved Evidence {} is unindexed; run belay sync",
+                    r.display_id
+                ),
+            });
+        };
+        let detail: Value = serde_json::from_str(&detail).map_err(|e| BelayError::Validation {
+            message: e.to_string(),
+        })?;
+        let mut statement=connection.prepare("SELECT target,relation FROM evidence_links JOIN evidence ON evidence.id=evidence_links.evidence_id WHERE evidence.display_id=?1 ORDER BY target,relation").map_err(|e|BelayError::sqlite(&path,e))?;
+        let links = statement
+            .query_map([&r.display_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| BelayError::sqlite(&path, e))?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|e| BelayError::sqlite(&path, e))?;
+        let mut expected_links = r
+            .links
+            .iter()
+            .map(|l| (l.target.clone(), l.relation.clone()))
+            .collect::<Vec<_>>();
+        expected_links.sort();
+        if kind != r.kind
+            || verdict != r.verdict
+            || commit != r.commit_sha
+            || captured != r.captured_at
+            || source != r.source
+            || issuer != r.issuer
+            || summary != r.summary
+            || detail != r.detail
+            || links != expected_links
+        {
+            return Err(BelayError::Conflict {
+                message: format!(
+                    "Evidence {} originals/index content drift; run belay sync",
+                    r.display_id
+                ),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn replace_index(
@@ -498,103 +606,68 @@ pub fn insert_record(
 }
 
 fn append_mirror(repository: &Repository, record: &EvidenceRecord) -> Result<(), BelayError> {
-    fs::create_dir_all(repository.evidence_path()).map_err(|source| {
-        BelayError::io(
-            "create evidence directory",
-            repository.evidence_path(),
-            source,
-        )
+    crate::lifecycle::ensure_directory(repository, Path::new("evidence/records"))?;
+    let path = repository
+        .evidence_path()
+        .join("records")
+        .join(format!("{}.json", record.display_id));
+    let bytes = serde_json::to_vec(record).map_err(|e| BelayError::Validation {
+        message: e.to_string(),
     })?;
-    let path = mirror_path(repository, &record.captured_at)?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .map_err(|source| BelayError::io("open evidence mirror", &path, source))?;
-    serde_json::to_writer(&mut file, record).map_err(|source| BelayError::Validation {
-        message: format!("could not serialize evidence record: {source}"),
-    })?;
-    file.write_all(b"\n")
-        .map_err(|source| BelayError::io("write evidence mirror", &path, source))
+    crate::store::write_new_file(repository, &path, &bytes)
 }
 
 pub fn read_located_mirrors(repository: &Repository) -> Result<Vec<ShownEvidence>, BelayError> {
-    let path = repository.evidence_path();
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    let mut files = fs::read_dir(&path)
-        .map_err(|source| BelayError::io("read evidence directory", &path, source))?
-        .map(|entry| {
-            entry
-                .map(|entry| entry.path())
-                .map_err(|source| BelayError::io("read evidence directory", &path, source))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    files.sort();
-    let mut records = Vec::new();
-    for file in files {
-        if file.extension().and_then(|extension| extension.to_str()) != Some("ndjson") {
-            continue;
-        }
-        let source_path = storage_path(repository, &file)?;
-        let reader = BufReader::new(
-            fs::File::open(&file)
-                .map_err(|source| BelayError::io("open evidence mirror", &file, source))?,
-        );
-        for (index, line) in reader.lines().enumerate() {
-            let source_line = index + 1;
-            let line =
-                line.map_err(|source| BelayError::io("read evidence mirror", &file, source))?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            let record: EvidenceRecord =
-                serde_json::from_str(&line).map_err(|source| BelayError::Validation {
-                    message: format!(
-                        "invalid evidence JSON in {source_path}:{source_line}: {source}"
-                    ),
-                })?;
-            validate_record(&record).map_err(|error| match error {
-                BelayError::Validation { message } => BelayError::Validation {
-                    message: format!(
-                        "invalid evidence record in {source_path}:{source_line}: {message}"
-                    ),
-                },
-                other => other,
+    let mut by_id = BTreeMap::<String, (String, ShownEvidence)>::new();
+    let loose = crate::pack::loose_evidence(repository)?;
+    for (raw, _) in loose {
+        let record: EvidenceRecord =
+            serde_json::from_str(&raw.raw_payload).map_err(|e| BelayError::Validation {
+                message: e.to_string(),
             })?;
-            records.push(ShownEvidence {
-                record,
-                source_path: source_path.clone(),
-                source_line,
-            });
+        let shown = ShownEvidence {
+            record,
+            source_path: format!(".belay/{}", raw.original_path),
+            source_line: raw.source_line,
+        };
+        merge_original(&mut by_id, raw.raw_hash, shown)?;
+    }
+    for packed in crate::pack::read_evidence(repository)? {
+        let shown = ShownEvidence {
+            record: packed.record,
+            source_path: format!(
+                ".belay/packs/{}.json:{}",
+                packed.pack_hash, packed.original_path
+            ),
+            source_line: packed.source_line,
+        };
+        merge_original(&mut by_id, packed.raw_hash, shown)?;
+    }
+    Ok(by_id.into_values().map(|(_, shown)| shown).collect())
+}
+fn merge_original(
+    records: &mut BTreeMap<String, (String, ShownEvidence)>,
+    raw_hash: String,
+    shown: ShownEvidence,
+) -> Result<(), BelayError> {
+    if let Some((old_hash, old)) = records.get(&shown.record.display_id) {
+        if old_hash != &raw_hash {
+            return validation(format!(
+                "conflicting duplicate evidence ID {} in {}:{} and {}:{}",
+                shown.record.display_id,
+                old.source_path,
+                old.source_line,
+                shown.source_path,
+                shown.source_line
+            ));
         }
+    } else {
+        records.insert(shown.record.display_id.clone(), (raw_hash, shown));
     }
-    let mut by_id = BTreeMap::<String, Vec<&ShownEvidence>>::new();
-    for item in &records {
-        by_id
-            .entry(item.record.display_id.clone())
-            .or_default()
-            .push(item);
-    }
-    if let Some((id, locations)) = by_id.iter().find(|(_, items)| items.len() > 1) {
-        let locations = locations
-            .iter()
-            .map(|item| format!("{}:{}", item.source_path, item.source_line))
-            .collect::<Vec<_>>()
-            .join(" and ");
-        return validation(format!("duplicate evidence ID {id} in {locations}"));
-    }
-    records.sort_by(|left, right| left.record.display_id.cmp(&right.record.display_id));
-    Ok(records)
+    Ok(())
 }
 
-fn storage_path(repository: &Repository, path: &Path) -> Result<String, BelayError> {
-    let relative = path.strip_prefix(&repository.root).unwrap_or(path);
-    crate::store::path_to_storage_string(relative)
-}
-
-fn validate_record(record: &EvidenceRecord) -> Result<(), BelayError> {
+pub(crate) fn validate_record(record: &EvidenceRecord) -> Result<(), BelayError> {
     if record.schema_version != EVIDENCE_SCHEMA_VERSION {
         return validation(format!(
             "unsupported evidence schema {}; expected {}",
@@ -624,7 +697,10 @@ fn validate_record(record: &EvidenceRecord) -> Result<(), BelayError> {
 fn validate_target(repository: &Repository, target: &str) -> Result<(), BelayError> {
     let reference = parse_entry_reference_id(target)?;
     let database_path = repository.database_path();
-    let connection = crate::database::open_read_only(&database_path)?;
+    let connection = match crate::database::open_read_only(&database_path) {
+        Ok(connection) => connection,
+        Err(_) => return validate_original_target(repository, &reference),
+    };
     let exists: Option<i64> = connection
         .query_row(
             "SELECT id FROM entries WHERE display_id = ?1",
@@ -637,6 +713,36 @@ fn validate_target(repository: &Repository, target: &str) -> Result<(), BelayErr
         return validation(format!("evidence target {target} was not found"));
     }
     crate::store::validate_reference_fragment(&connection, &database_path, &reference)?;
+    Ok(())
+}
+
+fn validate_original_target(
+    repository: &Repository,
+    reference: &crate::entry::EntryReferenceParts,
+) -> Result<(), BelayError> {
+    let mut entries = crate::pack::loose_entries(repository)?;
+    entries.extend(
+        crate::pack::read_entries(repository)?
+            .into_iter()
+            .map(|p| p.entry),
+    );
+    let selected = entries
+        .into_iter()
+        .filter(|e| e.display_id == reference.display_id)
+        .max_by_key(|e| e.revision)
+        .ok_or_else(|| BelayError::Validation {
+            message: format!("Evidence target {} has no original", reference.display_id),
+        })?;
+    if let Some(fragment) = &reference.fragment {
+        if crate::trace_ids::fragment_definition(selected.entry_type, &selected.body, fragment)
+            .is_none()
+        {
+            return validation(format!(
+                "Evidence target {} fragment #{fragment} missing or ambiguous in original",
+                selected.display_id
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -667,39 +773,20 @@ fn validate_verdict(verdict: &str) -> Result<(), BelayError> {
     }
 }
 
-fn allocate_display_id(repository: &Repository, captured_at: &str) -> Result<String, BelayError> {
-    let timestamp = DateTime::parse_from_rfc3339(captured_at)
-        .map_err(|source| BelayError::Validation {
-            message: format!("captured-at must be an RFC3339 timestamp: {source}"),
-        })?
-        .format("%Y%m%dT%H%M%S")
-        .to_string();
-    let mirrored: BTreeSet<String> = read_located_mirrors(repository)?
-        .into_iter()
-        .map(|item| item.record.display_id)
-        .collect();
-    let database_path = repository.database_path();
-    let connection = crate::database::open_read_only(&database_path)?;
-    for sequence in 1..=999 {
-        let candidate = format!("EVD-{timestamp}-{sequence:03}");
-        let exists: Option<i64> = connection
-            .query_row(
-                "SELECT id FROM evidence WHERE display_id = ?1",
-                [candidate.as_str()],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(|source| BelayError::sqlite(&database_path, source))?;
-        if exists.is_none() && !mirrored.contains(&candidate) {
-            return Ok(candidate);
-        }
-    }
-    validation(format!(
-        "more than 999 evidence records exist for {timestamp}"
-    ))
+fn allocate_display_id(_repository: &Repository, _captured_at: &str) -> Result<String, BelayError> {
+    Ok(format!("EVD-{}", crate::lifecycle::random_id()?))
 }
 
-fn validate_evidence_id(value: &str) -> Result<(), BelayError> {
+pub(crate) fn validate_evidence_id(value: &str) -> Result<(), BelayError> {
+    if let Some(hex) = value.strip_prefix("EVD-") {
+        if hex.len() == 32
+            && hex
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Ok(());
+        }
+    }
     let mut parts = value.split('-');
     if parts.next() != Some("EVD") {
         return validation(format!("invalid evidence ID {value:?}"));
@@ -717,16 +804,6 @@ fn validate_evidence_id(value: &str) -> Result<(), BelayError> {
         return validation(format!("invalid evidence ID {value:?}"));
     }
     Ok(())
-}
-
-fn mirror_path(repository: &Repository, captured_at: &str) -> Result<PathBuf, BelayError> {
-    let month = DateTime::parse_from_rfc3339(captured_at)
-        .map_err(|source| BelayError::Validation {
-            message: format!("captured-at must be an RFC3339 timestamp: {source}"),
-        })?
-        .format("%Y-%m")
-        .to_string();
-    Ok(repository.evidence_path().join(format!("{month}.ndjson")))
 }
 
 fn now() -> String {
@@ -762,7 +839,7 @@ pub fn freshness(
     freshness_at(repository, head, commit_sha, captured_at, Utc::now())
 }
 
-fn freshness_at(
+pub(crate) fn freshness_at(
     repository: &Repository,
     head: Option<&str>,
     commit_sha: &str,
@@ -1110,7 +1187,8 @@ mod tests {
         write_ndjson(
             &duplicate_repo,
             "2026-09.ndjson",
-            &[&sample_json("EVD-20260901T120000-001")],
+            &[&sample_json("EVD-20260901T120000-001")
+                .replace("mirror-only record", "conflicting record")],
         );
         let duplicate = show_err(&duplicate_repo, "EVD-20260901T120000-001");
         assert!(duplicate.contains("duplicate evidence ID"), "{duplicate}");

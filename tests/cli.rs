@@ -2384,7 +2384,7 @@ fn links_and_evidence_require_defined_goal_and_plan_fragments() {
         .query_row("SELECT target FROM evidence_links", [], |row| row.get(0))
         .expect("read evidence target");
     assert_eq!(evidence_target, format!("{goal}#sc-001"));
-    let evidence_mirror = fs::read_dir(temporary.path().join(".belay/evidence"))
+    let evidence_mirror = fs::read_dir(temporary.path().join(".belay/evidence/records"))
         .expect("read evidence directory")
         .next()
         .expect("evidence mirror")
@@ -2416,9 +2416,10 @@ fn links_and_evidence_require_defined_goal_and_plan_fragments() {
             .contains("fragment #sc-999 was not found")
     );
 
-    let evidence_files_before_rejection = fs::read_dir(temporary.path().join(".belay/evidence"))
-        .expect("read evidence directory")
-        .count();
+    let evidence_files_before_rejection =
+        fs::read_dir(temporary.path().join(".belay/evidence/records"))
+            .expect("read evidence directory")
+            .count();
     let rejected_evidence = belay()
         .args([
             "verify",
@@ -2439,7 +2440,7 @@ fn links_and_evidence_require_defined_goal_and_plan_fragments() {
         .expect("reject missing evidence fragment");
     assert_eq!(rejected_evidence.status.code(), Some(4));
     assert_eq!(
-        fs::read_dir(temporary.path().join(".belay/evidence"))
+        fs::read_dir(temporary.path().join(".belay/evidence/records"))
             .expect("read evidence directory")
             .count(),
         evidence_files_before_rejection
@@ -5616,7 +5617,24 @@ fn show_evidence_prefix_and_error_boundaries_are_fail_closed() {
         .current_dir(temporary.path())
         .output()
         .expect("duplicate show");
-    assert_eq!(duplicate.status.code(), Some(4), "{duplicate:?}");
+    assert!(
+        duplicate.status.success(),
+        "identical originals deduplicate: {duplicate:?}"
+    );
+    fs::write(
+        dir.join("2026-08.ndjson"),
+        format!(
+            "{}\n",
+            record(first).replace("mirror-only record", "conflicting record")
+        ),
+    )
+    .expect("write conflicting original");
+    let duplicate = belay()
+        .args(["show", first])
+        .current_dir(temporary.path())
+        .output()
+        .expect("conflicting show");
+    assert!(!duplicate.status.success(), "{duplicate:?}");
     let duplicate_stderr = String::from_utf8(duplicate.stderr).expect("stderr");
     assert!(
         duplicate_stderr.contains("duplicate evidence ID"),
@@ -5665,7 +5683,7 @@ fn sync_indexes_mirror_only_evidence_and_rebuild_reports_separate_counts() {
     assert!(
         String::from_utf8(before_status.stdout)
             .expect("stdout")
-            .contains("No evidence recorded")
+            .contains("mirror-only record")
     );
 
     let synced = belay()
@@ -5747,7 +5765,7 @@ fn sync_and_rebuild_preserve_existing_evidence_index_on_invalid_mirrors() {
     };
     assert_eq!(count_evidence(), 1);
 
-    let evidence_dir = fs::read_dir(temporary.path().join(".belay/evidence"))
+    let evidence_dir = fs::read_dir(temporary.path().join(".belay/evidence/records"))
         .expect("read evidence")
         .next()
         .expect("evidence file")
@@ -5769,12 +5787,8 @@ fn sync_and_rebuild_preserve_existing_evidence_index_on_invalid_mirrors() {
         .current_dir(temporary.path())
         .output()
         .expect("status after failed sync");
-    assert!(status.status.success(), "{status:?}");
-    assert!(
-        String::from_utf8(status.stdout)
-            .expect("stdout")
-            .contains("indexed before corruption")
-    );
+    // A retained cache is not authority when its original is corrupt.
+    assert_eq!(status.status.code(), Some(4), "{status:?}");
 
     let rebuilt = belay()
         .arg("rebuild")

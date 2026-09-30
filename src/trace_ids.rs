@@ -204,17 +204,7 @@ fn valid_numbered_id(value: &str, prefix: &str) -> bool {
 }
 
 fn valid_evidence_id(value: &str) -> bool {
-    let mut parts = value.split('-');
-    let prefix = parts.next();
-    let timestamp = parts.next().unwrap_or_default();
-    let sequence = parts.next().unwrap_or_default();
-    prefix == Some("EVD")
-        && parts.next().is_none()
-        && chrono::NaiveDateTime::parse_from_str(timestamp, "%Y%m%dT%H%M%S").is_ok()
-        && sequence.len() == 3
-        && sequence
-            .parse::<u16>()
-            .is_ok_and(|number| (1..=999).contains(&number))
+    crate::evidence::validate_evidence_id(value).is_ok()
 }
 
 fn id_character(character: char) -> bool {
@@ -508,5 +498,17 @@ mod tests {
         assert_eq!(spans[0].value, "GOAL-20260723T120000-001-safe-sync#sc-001");
         assert!(!spans[0].evidence);
         assert!(spans[1].evidence);
+    }
+
+    #[test]
+    fn distributed_evidence_references_use_the_same_validator_as_storage() {
+        let id = "EVD-0123456789abcdef0123456789abcdef";
+        let spans = reference_spans(&format!(
+            "Proof: {id}; malformed EVD-0123456 and {id}#sc-001"
+        ));
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].value, id);
+        assert!(spans[0].evidence);
+        assert!(!valid_evidence_id("EVD-0123456789ABCDEF0123456789ABCDEF"));
     }
 }

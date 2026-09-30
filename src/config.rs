@@ -109,7 +109,7 @@ impl Config {
     }
 
     fn validate(&self, path: &Path) -> Result<(), BelayError> {
-        if self.schema_version != CONFIG_SCHEMA_VERSION {
+        if ![1, 2].contains(&self.schema_version) {
             return Err(BelayError::InvalidConfig {
                 path: path.to_path_buf(),
                 message: format!(

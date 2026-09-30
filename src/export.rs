@@ -63,6 +63,7 @@ pub fn write(
     filter: &ExportFilter,
 ) -> Result<usize, BelayError> {
     validate_filter(filter)?;
+    crate::evidence::validate_index_sources(repository)?;
     let output = absolute_path(&repository.root, output);
     let entries = load_entries(repository, filter)?;
     let rendered = match format {

@@ -64,6 +64,9 @@ pub fn report(
     target: Option<&str>,
     include_completed: bool,
 ) -> Result<CoverageReport, BelayError> {
+    // Do not report cached verification after original publication, corruption,
+    // or source/index drift. This is read-only and never silently repairs state.
+    evidence::validate_index_sources(repository)?;
     let resolved_target = match target {
         Some(target) => {
             let resolved = crate::store::resolve_reference(repository, target)?;

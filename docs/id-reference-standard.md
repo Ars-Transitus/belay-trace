@@ -10,13 +10,14 @@ ID は二層に分ける。
 | 対象 | 形式 | スコープ | 例 |
 | --- | --- | --- | --- |
 | Entry | `<TYPE>-<timestamp>-<sequence>-<slug>` | repository | `GOAL-20260723T120000-001-safe-sync` |
-| Evidence | `EVD-<timestamp>-<sequence>` | repository | `EVD-20260723T120500-001` |
+| Evidence | `EVD-<32 lowercase hexadecimal digits>`（旧 timestamp/sequence 形式も読取可能） | 分散発行 | `EVD-0123456789abcdef0123456789abcdef` |
 | Success Criterion | `SC-NNN` | defining Goal | `SC-001` |
 | Delivery task | `T-NNN` | defining Plan | `T-001` |
 
 Entry type prefix は `GOAL`、`PLN`、`DEC`、`WRK`、`REV`、`NOTE` とする。
-timestamp は `created_at` または `captured_at` の時刻を compact form にしたもので、
-同一秒内 sequence とともに Belay が採番する。
+Entry と旧 Evidence の timestamp は `created_at` または `captured_at` の時刻を
+compact form にしたもので、同一秒内 sequence とともに Belay が採番する。
+新 Evidence は128bitの乱数IDを独立発行し、日時は record の `captured_at` に保持する。
 
 `SC-NNN` と `T-NNN` はそれぞれ `001` から始め、定義文書内で単調増加させる。
 並べ替え、状態変更、文言変更では再採番しない。削除・統合した ID は欠番のまま
@@ -184,13 +185,14 @@ canonical でない、存在しない、一意に解決しない fragment は、
 fallback せずエラーになる。要求していないものを黙って返さないためである。
 
 Evidence は fragment を持たない。`belay show EVD-...` は exact ID または一意
-prefix だけを `.belay/evidence/*.ndjson` から解決する。slug は使えない。
+prefix だけを旧月次NDJSON、個別record、検証済みpackの原本から解決する。slug は使えない。
 SQLite 未indexでも durable record を表示できる。Herdr などの runner は自身の
 provenance を使い、`show EVD` を settlement の必須ゲートにしない。Task
 settlement と Goal coverage は別判断である。
 
-section の切り出しには `entry_chunks` を用いる。検索や context 生成と同じ
-分割規則であり、Markdown を別途解析し直すことはない。
+`show` の section 切り出しには `entry_chunks` を用いる。実行用の
+`context compile --focus` は Task の入れ子見出しを含む全境界を原本から
+取得し、必須情報が予算に収まらなければ失敗する。
 
 ## 6. 並行書き込み
 
