@@ -1,0 +1,209 @@
+{
+  "active_goals": 8,
+  "dimensions": [
+    {
+      "name": "decision",
+      "traceability": {
+        "covered": 2,
+        "total": 8,
+        "percent": 25
+      },
+      "verified": {
+        "covered": 1,
+        "total": 8,
+        "percent": 12
+      }
+    },
+    {
+      "name": "implementation",
+      "traceability": {
+        "covered": 8,
+        "total": 8,
+        "percent": 100
+      },
+      "verified": {
+        "covered": 4,
+        "total": 8,
+        "percent": 50
+      }
+    },
+    {
+      "name": "test",
+      "traceability": {
+        "covered": 4,
+        "total": 8,
+        "percent": 50
+      },
+      "verified": {
+        "covered": 2,
+        "total": 8,
+        "percent": 25
+      }
+    },
+    {
+      "name": "monitoring",
+      "traceability": {
+        "covered": 0,
+        "total": 8,
+        "percent": 0
+      },
+      "verified": {
+        "covered": 0,
+        "total": 8,
+        "percent": 0
+      }
+    }
+  ],
+  "uncovered": [
+    {
+      "goal_id": "GOAL-20260726T014020-001-enable-responsible-traceable-evolutionary-develo",
+      "dimension": "test",
+      "reason": "no test or CI evidence",
+      "next_action": "record fresh passing test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260726T014020-001-enable-responsible-traceable-evolutionary-develo",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260729T204514-001-streamline-agent-workflow-output",
+      "dimension": "decision",
+      "reason": "decision evidence missing, stale, or not passing",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260729T204514-001-streamline-agent-workflow-output",
+      "dimension": "implementation",
+      "reason": "work evidence missing, stale, or not passing",
+      "next_action": "link work and record fresh test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260729T204514-001-streamline-agent-workflow-output",
+      "dimension": "test",
+      "reason": "test evidence stale or failing",
+      "next_action": "record fresh passing test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260729T204514-001-streamline-agent-workflow-output",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T093055-001-agent-consumable-plan-en",
+      "dimension": "decision",
+      "reason": "no fulfills decision entry",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T093055-001-agent-consumable-plan-en",
+      "dimension": "implementation",
+      "reason": "work evidence missing, stale, or not passing",
+      "next_action": "link work and record fresh test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T093055-001-agent-consumable-plan-en",
+      "dimension": "test",
+      "reason": "no test or CI evidence",
+      "next_action": "record fresh passing test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T093055-001-agent-consumable-plan-en",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T185935-001-library-status-include-e",
+      "dimension": "decision",
+      "reason": "no fulfills decision entry",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T185935-001-library-status-include-e",
+      "dimension": "implementation",
+      "reason": "work evidence missing, stale, or not passing",
+      "next_action": "link work and record fresh test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T185935-001-library-status-include-e",
+      "dimension": "test",
+      "reason": "test evidence stale or failing",
+      "next_action": "record fresh passing test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260817T185935-001-library-status-include-e",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260820T214155-001-retrieval-hygiene-archiv",
+      "dimension": "decision",
+      "reason": "no fulfills decision entry",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260820T214155-001-retrieval-hygiene-archiv",
+      "dimension": "implementation",
+      "reason": "work evidence missing, stale, or not passing",
+      "next_action": "link work and record fresh test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260820T214155-001-retrieval-hygiene-archiv",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260901T091831-001-direct-evidence-retrieva",
+      "dimension": "decision",
+      "reason": "no fulfills decision entry",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260901T091831-001-direct-evidence-retrieva",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260906T134724-001-context-cost-reduction",
+      "dimension": "decision",
+      "reason": "no fulfills decision entry",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260906T134724-001-context-cost-reduction",
+      "dimension": "test",
+      "reason": "no test or CI evidence",
+      "next_action": "record fresh passing test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260906T134724-001-context-cost-reduction",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    },
+    {
+      "goal_id": "GOAL-20260925T214740-001-belay-guidance-boundarie",
+      "dimension": "decision",
+      "reason": "no fulfills decision entry",
+      "next_action": "link an accepted decision and record passing evidence"
+    },
+    {
+      "goal_id": "GOAL-20260925T214740-001-belay-guidance-boundarie",
+      "dimension": "test",
+      "reason": "no test or CI evidence",
+      "next_action": "record fresh passing test or CI evidence"
+    },
+    {
+      "goal_id": "GOAL-20260925T214740-001-belay-guidance-boundarie",
+      "dimension": "monitoring",
+      "reason": "no metric evidence",
+      "next_action": "record fresh metric evidence"
+    }
+  ]
+}

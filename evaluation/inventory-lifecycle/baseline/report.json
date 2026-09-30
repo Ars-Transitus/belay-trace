@@ -1,0 +1,873 @@
+{
+  "base_commit": "9d4b16e341a23ee505fad1d2315fb389b892a298",
+  "captured_at": "2026-09-30T12:57:20.545906+00:00",
+  "repository": "/Users/ars/dev/repo/github.com/Ars-Transitus/belay-trace",
+  "version": "0.6.3",
+  "entry_distribution": [
+    {
+      "type": "decision",
+      "status": "accepted",
+      "count": 9
+    },
+    {
+      "type": "decision",
+      "status": "proposed",
+      "count": 2
+    },
+    {
+      "type": "goal",
+      "status": "active",
+      "count": 8
+    },
+    {
+      "type": "goal",
+      "status": "archived",
+      "count": 1
+    },
+    {
+      "type": "goal",
+      "status": "completed",
+      "count": 4
+    },
+    {
+      "type": "goal",
+      "status": "draft",
+      "count": 5
+    },
+    {
+      "type": "note",
+      "status": "active",
+      "count": 12
+    },
+    {
+      "type": "plan",
+      "status": "active",
+      "count": 2
+    },
+    {
+      "type": "plan",
+      "status": "approved",
+      "count": 8
+    },
+    {
+      "type": "plan",
+      "status": "archived",
+      "count": 1
+    },
+    {
+      "type": "plan",
+      "status": "completed",
+      "count": 6
+    },
+    {
+      "type": "plan",
+      "status": "draft",
+      "count": 1
+    },
+    {
+      "type": "review",
+      "status": "completed",
+      "count": 20
+    },
+    {
+      "type": "review",
+      "status": "pending",
+      "count": 1
+    },
+    {
+      "type": "work",
+      "status": "completed",
+      "count": 28
+    },
+    {
+      "type": "work",
+      "status": "in-progress",
+      "count": 5
+    }
+  ],
+  "evidence_distribution": [
+    {
+      "verdict": "fail",
+      "count": 4
+    },
+    {
+      "verdict": "pass",
+      "count": 135
+    },
+    {
+      "verdict": "warn",
+      "count": 8
+    }
+  ],
+  "entry_links": 148,
+  "evidence_links": 200,
+  "storage": {
+    "other/unclassified": {
+      "files": 6,
+      "bytes": 6
+    },
+    "entries/decisions": {
+      "files": 11,
+      "bytes": 24064
+    },
+    "entries/goals": {
+      "files": 18,
+      "bytes": 55396
+    },
+    "entries/notes": {
+      "files": 12,
+      "bytes": 17322
+    },
+    "entries/plans": {
+      "files": 18,
+      "bytes": 116846
+    },
+    "entries/reviews": {
+      "files": 21,
+      "bytes": 77445
+    },
+    "entries/work": {
+      "files": 33,
+      "bytes": 46624
+    },
+    "evidence/original": {
+      "files": 3,
+      "bytes": 86996
+    },
+    "state/unclassified": {
+      "files": 5,
+      "bytes": 6669903
+    }
+  },
+  "growth_rate": null,
+  "token_estimator": "ceil(UTF-8 output bytes / 4); approximate, not model tokenizer",
+  "cases": [
+    {
+      "case": "live",
+      "argv": [
+        "context",
+        "compile",
+        "--format",
+        "agent",
+        "--budget",
+        "2500"
+      ],
+      "expected_references": [
+        "GOAL-20260925T214740-001-belay-guidance-boundarie"
+      ],
+      "exit_code": 0,
+      "seconds": [
+        0.24763987492769957,
+        0.04461787501350045,
+        0.023098750039935112
+      ],
+      "output_bytes": 9509,
+      "estimated_tokens": 2378,
+      "expected_reference_present": true,
+      "manual_search_count": null,
+      "limitation": "Direct command probe after selecting IDs from index; not an agent navigation trial."
+    },
+    {
+      "case": "resume",
+      "argv": [
+        "context",
+        "compile",
+        "--focus",
+        "PLN-20260906T134828-001-context-cost-first-phase#t-001",
+        "--format",
+        "agent",
+        "--budget",
+        "2500"
+      ],
+      "expected_references": [
+        "PLN-20260906T134828-001-context-cost-first-phase"
+      ],
+      "exit_code": 0,
+      "seconds": [
+        0.08097558293957263,
+        0.05027583404444158,
+        0.05193229194264859
+      ],
+      "output_bytes": 3997,
+      "estimated_tokens": 1000,
+      "expected_reference_present": true,
+      "manual_search_count": null,
+      "limitation": "Direct command probe after selecting IDs from index; not an agent navigation trial."
+    },
+    {
+      "case": "decision",
+      "argv": [
+        "show",
+        "DEC-20260725T203527-001-use-cytoscape-double-click-window-for-explore-ar"
+      ],
+      "expected_references": [
+        "DEC-20260725T203527-001-use-cytoscape-double-click-window-for-explore-ar"
+      ],
+      "exit_code": 0,
+      "seconds": [
+        0.005114750005304813,
+        0.0047427910612896085,
+        0.004820582922548056
+      ],
+      "output_bytes": 1337,
+      "estimated_tokens": 335,
+      "expected_reference_present": true,
+      "manual_search_count": null,
+      "limitation": "Direct command probe after selecting IDs from index; not an agent navigation trial."
+    },
+    {
+      "case": "failure",
+      "argv": [
+        "show",
+        "EVD-20260926T004249-001"
+      ],
+      "expected_references": [
+        "EVD-20260926T004249-001"
+      ],
+      "exit_code": 0,
+      "seconds": [
+        0.0062455839943140745,
+        0.004903375054709613,
+        0.004946665954776108
+      ],
+      "output_bytes": 618,
+      "estimated_tokens": 155,
+      "expected_reference_present": true,
+      "manual_search_count": null,
+      "limitation": "Direct command probe after selecting IDs from index; not an agent navigation trial."
+    },
+    {
+      "case": "goal-evidence",
+      "argv": [
+        "coverage"
+      ],
+      "expected_references": [
+        "GOAL-20260925T214740-001-belay-guidance-boundarie"
+      ],
+      "exit_code": 0,
+      "seconds": [
+        0.3331433329731226,
+        0.3417889999691397,
+        0.3056086249416694
+      ],
+      "output_bytes": 3839,
+      "estimated_tokens": 960,
+      "expected_reference_present": true,
+      "manual_search_count": null,
+      "limitation": "Direct command probe after selecting IDs from index; not an agent navigation trial."
+    }
+  ],
+  "source_manifest": [
+    {
+      "path": ".belay/entries/decisions/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260725T203527-001-use-cytoscape-double-click-window-for-explore-ar.md",
+      "sha256": "0fe488132cf2b28bd66a8d6fef3d2298afbff72dcdf2859f5a0c39e390c754c5",
+      "bytes": 1179
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260726T011127-001-separate-agent-guidance-concerns-and-improve-bel.md",
+      "sha256": "d179b91579d9b5e462ae6942321b2edacac18fdec41429745344fdb8576d65b9",
+      "bytes": 3092
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260727T192305-001-close-phase-6-mvp-and-reopen-only-on-observed-ne.md",
+      "sha256": "c24eab0a84eee4b44e833d8a8a19c1a6613c9d76efba9e484c80e6ca63a4e336",
+      "bytes": 3421
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260728T214035-001-prioritize-route-functional-design-and-defer-mod.md",
+      "sha256": "4bfb7d6ab492e4d927ef6cb28d1af6ff080f4ee5439f23e0b973c99e01184c4d",
+      "bytes": 2769
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260729T200801-001-use-primary-thread-route-runs-and-deterministic-b.md",
+      "sha256": "8150357824fa1c85b625c5349715888db8d89afbf14ccc5677fb6bc6aff69c42",
+      "bytes": 2679
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260729T205908-001-streamline-agent-output.md",
+      "sha256": "9d12b42e409a10e2aae252d285ae25fdf2149925d2cd9ba6021af507927a3aff",
+      "bytes": 1389
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260729T213700-001-store-route-runs-locally.md",
+      "sha256": "29ffe1259ac11276289a155de81adc1161de063d11d02c1427654f1fdb56d266",
+      "bytes": 2748
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260729T221157-001-use-operation-level-recovery.md",
+      "sha256": "5a35125df32005887ae5c6ee761eb04a28a8fe4a3d6344873c96f1a322c82a22",
+      "bytes": 2414
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260730T190623-001-conversational-preview-a.md",
+      "sha256": "b20e17ee427bdee8a44c8560e15458be5965c1902a0d848ce6dcf7e0db1cf6ec",
+      "bytes": 2280
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260826T213456-001-derive-goal-from-task.md",
+      "sha256": "da2e3f8da0b16d15f9b600be0a3c9cd868bd8bb0eaecb8cbbb13893c612f7182",
+      "bytes": 1107
+    },
+    {
+      "path": ".belay/entries/decisions/DEC-20260906T204529-001-repair-context-dedupe.md",
+      "sha256": "f605a4b7342b19ca7fccb32cef2139179b20730bc90b70d70cae9550b2c9adfe",
+      "bytes": 986
+    },
+    {
+      "path": ".belay/entries/goals/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260712T163956-001-maintain-intent-to-evidence-alignment-during-age.md",
+      "sha256": "21405fbe39419582108e17db762943b1661fddc30919a3852b471d08d2e8c499",
+      "bytes": 2700
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260725T194008-001-make-explore-node-activation-reliable-and-unambi.md",
+      "sha256": "be0e667af8a21afad001ef5c8b5125e717fac51864ec7be111960b394b294b00",
+      "bytes": 3379
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260725T220102-001-prepare-a-validated-0-3-2-patch-release.md",
+      "sha256": "e43cad6d655b6497c5d7a2a541c6c5fd87f5067f35920bcde8f065ee74834180",
+      "bytes": 2588
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260726T011059-001-make-belay-agent-usage-self-guiding-and-reliable.md",
+      "sha256": "1c1fab9caa8c17f5f02334b1781120e35412ed407ed6d77739196e972c3b9299",
+      "bytes": 3186
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260726T014020-001-enable-responsible-traceable-evolutionary-develo.md",
+      "sha256": "130a11c417d1afe8c73c6fadf479780604eb50c325cefbc10947b0ea6d2d19a1",
+      "bytes": 5860
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260726T103644-001-make-belay-route-decision-state-legible-and-trus.md",
+      "sha256": "082ac00f0e6caef91afa75665c1b6bc9c0ff89a5b2c9d9749e2746593c4f9047",
+      "bytes": 6738
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260729T204514-001-streamline-agent-workflow-output.md",
+      "sha256": "08c69430c4947e092daf9847a156ebf75168d72bcab0c19cb001c6b4d7a169a3",
+      "bytes": 1936
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260801T212650-001-risk-based-agent-workflo.md",
+      "sha256": "f1dd41946657cc50cd407fd203183f2c6c4ae528cefefe5ee64919e35cb84885",
+      "bytes": 1951
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260801T221649-001-configure-project-agent.md",
+      "sha256": "a620ca0aa008911c60e024aa2f66906c64598f11f6d4ae60839fecc0cec3d710",
+      "bytes": 2056
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260801T223214-001-configure-claude-agent-m.md",
+      "sha256": "1c137db4a8d9706b38d7d9707a3ebf10e25e4392689759ece19fd36de8cf4f15",
+      "bytes": 1878
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260817T093055-001-agent-consumable-plan-en.md",
+      "sha256": "9686431ddfbd2a28c041fc3218a36b1f011c876f9475f1e91085b899fd77efd1",
+      "bytes": 5556
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260817T185935-001-library-status-include-e.md",
+      "sha256": "02496bba43847192a5c59d4deb9c55f07478823ceabbafd25abe6ba745f1ff6d",
+      "bytes": 2638
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260820T214155-001-retrieval-hygiene-archiv.md",
+      "sha256": "17a64ff68a119f5c1bce0e9e86978a838442d68a541253796efa743baae1aa39",
+      "bytes": 3066
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260826T213421-001-atomic-work-creation.md",
+      "sha256": "5abc9595c4af7a3a5303d0f49f39cf2ce8722c29fa1bd64d5673a879563766c1",
+      "bytes": 2692
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260826T213655-001-orphan-tolerant-work-ret.md",
+      "sha256": "5642d5c67c129e3d78e3ab45e30449b72a1328231aa0647a7d15df3d6f2313c7",
+      "bytes": 1949
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260901T091831-001-direct-evidence-retrieva.md",
+      "sha256": "91f466164a8dccc10c28b4bd8dc397cc2b7a3bf917856be140764f3726d111a6",
+      "bytes": 3478
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260906T134724-001-context-cost-reduction.md",
+      "sha256": "41018e559c21f0806489bee96541750e81e58a3810f432fb6ffc1613f3c2a796",
+      "bytes": 2547
+    },
+    {
+      "path": ".belay/entries/goals/GOAL-20260925T214740-001-belay-guidance-boundarie.md",
+      "sha256": "ec2c86da6092bd0e4c008c317dab82a328f36810ea6c9dfc41fa1913fb1805b2",
+      "bytes": 1198
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260712T134440-001-workflow-feedback-from-first-external-adoption-m.md",
+      "sha256": "31065e5a88504244ba1a19eca0b6573bcfe87fc3ce2d7954d922b3fe49be855a",
+      "bytes": 4068
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260728T214040-001-human-multitasking-observation-and-post-route-au.md",
+      "sha256": "55f381b33b8fb4f8b2e21ff8478f018b84c64b1dd5c9ff2e0ccd7170aa8b8237",
+      "bytes": 2763
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260729T202616-001-keep-route-cli-first-and-reconsider-mcp-on-obser.md",
+      "sha256": "cbd501b8fa39491749416f5cda7903f366d2ab07d5b21f11b2d2b2cadfcc7bdf",
+      "bytes": 2788
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260730T185408-001-route-mvp-first-dogfood.md",
+      "sha256": "ac1d843469e3cdab1a6f5258df5fd365197e73d9fc6017b64dc89b7e2c9e14ee",
+      "bytes": 1032
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260811T124100-001-handoff-agent-config.md",
+      "sha256": "6ef4be4a56b07579e67638903b9353aa5223cb2052923a47955237382999490d",
+      "bytes": 1013
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-001-routed-worker-policy-com.md",
+      "sha256": "b9fed4e50b5b9dc41e3004b4d39cd2dbae5dda57e8967256a5c6b7c1170b1b2d",
+      "bytes": 976
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-002-routed-worker-policy-imp.md",
+      "sha256": "bf9366d34b3da54e45434677108f7cd4635d005d204916a215bd7a0dca92efaf",
+      "bytes": 706
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-003-routed-worker-policy-imp.md",
+      "sha256": "8b59a6a23ecab3f312af9d6691d9a92b3eea34a358a541dbaebca951d3bcb2b6",
+      "bytes": 705
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-004-routed-worker-policy-imp.md",
+      "sha256": "3aa718d015da98be2dc933ada40b976f05bd210675dd8b2efae4290ade4b37b1",
+      "bytes": 708
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-005-routed-worker-policy-rev.md",
+      "sha256": "9ff66009dbafee41b9b9d2507fc651b8ce712f0b8d7e114ab597dbd2cd275170",
+      "bytes": 854
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-006-routed-worker-policy-rev.md",
+      "sha256": "a4988b373269dc407e3772c4e3d9356b56ea349d3126b98e5cd9d2b15ffca855",
+      "bytes": 853
+    },
+    {
+      "path": ".belay/entries/notes/NOTE-20260906T133449-007-routed-worker-policy-rev.md",
+      "sha256": "3deba1d8d6a185095086e563d4bee76b1ddc01cd540c70f575bb305ba7b160df",
+      "bytes": 856
+    },
+    {
+      "path": ".belay/entries/plans/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260712T164000-001-deliver-phase-6-assurance-incrementally.md",
+      "sha256": "b4a52c6753b1c13593f9e72768fa6f581bf2b46512cff02b78b9582ce754c06a",
+      "bytes": 5400
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260722T225244-001-add-a-local-trace-provenance-browser.md",
+      "sha256": "4406b0c268b406b97f6c21ef3233978e22414bf67109a5cf25c61ee1ed946ac9",
+      "bytes": 10627
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260725T194011-001-resolve-explore-single-and-double-click-contenti.md",
+      "sha256": "975d42ef4297fab8454f68726dbfc5ba2a1a9ee6b73b1889e0e1d5846756dae1",
+      "bytes": 7770
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260725T220123-001-prepare-version-0-3-2-without-publishing.md",
+      "sha256": "fbbd2b0f87ec5d143ae25288455b8ef8e8c78a3da6a2ecba97ac42e76c1244f0",
+      "bytes": 3962
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260726T104808-001-validate-the-belay-route-protocol-before-product.md",
+      "sha256": "cc7f5dda6bd852bd652071a7604437fcd1ac939a605b510b67a0580483bed809",
+      "bytes": 11624
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260726T113522-001-make-belay-agent-guidance-operational-and-observ.md",
+      "sha256": "c60855a9d2c5a1e39562b3a4c0a264e24415b6b8668fce6a8faba765e747ccaf",
+      "bytes": 13530
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260729T204610-001-align-agent-templates-and-output.md",
+      "sha256": "b9951fab557353561aa3fd6feb32dbfb0a7def5570e224009dccb7602f90adfd",
+      "bytes": 2688
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260801T212740-001-optimize-agent-workflow.md",
+      "sha256": "3b29c5894effffaab7673d9da18b7a8ca6d43bb905745e261bb9c8c1b2c5c7fc",
+      "bytes": 2951
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260801T221653-001-configure-project-agents.md",
+      "sha256": "b757ca5f447fd3ea8e6490473c5c52e4f590c7b15fcedd6234f34cd54f36ebd4",
+      "bytes": 2868
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260801T223214-001-configure-claude-agents.md",
+      "sha256": "ac2c617d1a02c68bff5ad15ef9b17f913b43ad7168ec95ab048e77bd7b1a0a59",
+      "bytes": 2582
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260817T093100-001-agent-consumable-plan-en.md",
+      "sha256": "72e989d5dc39ccfb41c23024528df88db083ce74177fc4a2633092d00c487bf1",
+      "bytes": 17340
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260817T190256-001-library-status-include-e.md",
+      "sha256": "1b5e455dd0e097cfd85b1cd0c8b7368ae7de40281c109d0417d725f755ae3314",
+      "bytes": 5141
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260820T214216-001-retrieval-hygiene-archiv.md",
+      "sha256": "a7f2945f718499429661cca940a3d838da6e793c16d78f4276e6b20aafeed071",
+      "bytes": 4941
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260826T213447-001-atomic-work-creation.md",
+      "sha256": "fb6a60b2e460bed76db406c33ddf641c6de039a8dfcf6b39172d3962112b9896",
+      "bytes": 4740
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260826T213712-001-orphan-tolerant-work-ret.md",
+      "sha256": "4737a1d0eed149f1b790470ba05fce300f9047ce9e7d79f65e430863944956cb",
+      "bytes": 3827
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260901T091831-001-implement-evidence-show.md",
+      "sha256": "0a1bbdd8d793825cdcc06ede44cdd9590724d539f8add93adffef087dd2db4a0",
+      "bytes": 6403
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260906T134828-001-context-cost-first-phase.md",
+      "sha256": "7013e30147af5b0eb7f80d0e2b3398f54c1bb37cd0506a4f26bf9001a2ce5906",
+      "bytes": 8239
+    },
+    {
+      "path": ".belay/entries/plans/PLN-20260925T214756-001-simplify-belay-guidance.md",
+      "sha256": "727d026ca1cadeed2a2cf634de92f96922fe7269cac8578ef8765a92785b37eb",
+      "bytes": 2213
+    },
+    {
+      "path": ".belay/entries/reviews/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T204017-001-review-explore-node-activation-arbitration.md",
+      "sha256": "974c290fab4ccebd90852b0ea47906238ec62eb45e26adf78fb40e670c7ecd7d",
+      "bytes": 2756
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T212313-001-review-explore-graph-spacing.md",
+      "sha256": "ce55ff9ea69303054cb5106d91844d7123f895330631aa7716400d7aef153537",
+      "bytes": 1464
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T212827-001-review-wider-explore-graph-spacing.md",
+      "sha256": "dca5a3c7226f18969b9733ad38e132682b6a95d044d45f85ccbd82f28a1c0bfd",
+      "bytes": 787
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T213412-001-review-explore-spacing-revert.md",
+      "sha256": "3f65330f7b8288580eae1872d76e3f052034a6ec3517a6b294db2292c0a8cd1f",
+      "bytes": 701
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T213758-001-review-25-percent-tighter-explore-spacing.md",
+      "sha256": "272832e99a422da587d345260f3990fec487f2d760f05d1d6906ac912ac51015",
+      "bytes": 735
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T215633-001-review-finalized-user-tuned-explore-spacing.md",
+      "sha256": "86870bc967ab14a45d26dfe39dbc884adc8597449623c0f439a6e818f3584309",
+      "bytes": 963
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260725T221402-001-review-0-3-2-release-candidate.md",
+      "sha256": "7dddc6baae8e847e1ce2b61c11ef29720f5abf57d36b21b2d71a79efde651c5a",
+      "bytes": 2563
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260726T101157-001-review-belay-route-goal-draft.md",
+      "sha256": "a7c5014531aca060a48af662c3c993c2f2d7289e19b8efdd961aca0ec964ba7e",
+      "bytes": 19549
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260726T125510-001-review-belay-route-protocol-validation-plan.md",
+      "sha256": "ab3a8c1831ef4c765214c9a174db238bf2ee9cda684b1f8363f72be0f640af6c",
+      "bytes": 22829
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260726T135148-001-review-operational-and-observable-belay-agent-gu.md",
+      "sha256": "478dd2db459ef7e0ea0730671544b207aecbbcb2a2dcdc8b1744c108e9a5b9fd",
+      "bytes": 5083
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260727T184743-001-evaluate-phase-6-agent-first-mvp-dogfooding.md",
+      "sha256": "d97104c17f8e7a0d1e9a7aff526e6dcab907906621a68e8e69b4686dd927dd0d",
+      "bytes": 6244
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260729T210644-001-review-agent-workflow-cl.md",
+      "sha256": "6d99cdd694003d3d5e60132792e88329f485ef28f06859ed55c5f9c8e466cfb9",
+      "bytes": 1670
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260729T230114-001-route-mvp-recovery-revie.md",
+      "sha256": "2e4376f370978ea592f24df9d6572ef4f9ae02011cc98123ef482ab8e5873545",
+      "bytes": 1077
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260730T181559-001-review-pr-rust-ci-fix.md",
+      "sha256": "788607997b65594a6afabb67060ad3def7b6c2baf65401c1e4c6b6fd3c805ff3",
+      "bytes": 911
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260730T203035-001-review-conversational-pr.md",
+      "sha256": "883425b3c3f4cdde3af627d6897d82847018e851b9126f2d9a315713083166ff",
+      "bytes": 782
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260801T213508-001-review-agent-workflow.md",
+      "sha256": "71ff2830d521c788e8a378e67fc473a6f71e241df6c0644adb97dd7e606b953e",
+      "bytes": 1676
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260801T222326-001-review-project-agent-mod.md",
+      "sha256": "b23cd02f73e82133eb16bde88b1332c001a2e19d8e804cdffee4c9851873e59b",
+      "bytes": 1487
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260801T223700-001-review-claude-agent-mode.md",
+      "sha256": "466e3f404839d50b69aa48b7aca7c7c52c199cf5962b0ceded0738c7a43564dd",
+      "bytes": 1993
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260906T201200-001-context-baseline-review.md",
+      "sha256": "e20af69952ae992b713d380abd7274ae44e1aefa300b4c23006c3d5bb760742e",
+      "bytes": 1002
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260906T203742-001-sc-002-context-compile-d.md",
+      "sha256": "b2aa3d56655bb13fe8e084684b23d0ccac3285af813294b0c3467ba0756c4ec5",
+      "bytes": 1821
+    },
+    {
+      "path": ".belay/entries/reviews/REV-20260906T204514-001-context-dedupe-recovery.md",
+      "sha256": "41eeb982ec018faea2b94f03c6d74f822a1b8ed9c28a4b64d816fe8072a62472",
+      "bytes": 1352
+    },
+    {
+      "path": ".belay/entries/work/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260712T165103-001-implement-phase-6-1-agent-first-delivery-assuran.md",
+      "sha256": "072eb400c24b1194884e4da585596b7df79792fe46b3ae8cc4213f06617dc5b2",
+      "bytes": 1049
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260712T172930-001-add-updater-for-existing-belay-projects.md",
+      "sha256": "472a40ad3b39487a1c3e4ca414b25508e1abe08df4cb81a339a907ddb4b7a0c2",
+      "bytes": 1064
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260722T231453-001-implement-local-trace-provenance-browser.md",
+      "sha256": "fcd689095303be96e693b384b55dad67107e6766402c354d0f7db13c330520e7",
+      "bytes": 740
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260723T192431-001-refine-browse-readability-and-trace-navigation.md",
+      "sha256": "0eacbf6497e144e2e0445473e97eaf490cc0ce3ee76e58a94d4557cdc28bdf25",
+      "bytes": 724
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T202757-001-implement-explore-node-activation-arbitration.md",
+      "sha256": "32c3f1ac3627c32fc9fd6bb228a0a9bf21ddf62ecab1b95b4d9ced5ca9e77bd1",
+      "bytes": 2783
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T212012-001-improve-explore-graph-spacing.md",
+      "sha256": "5639f948356bd2c2def5bc4885a2c1be672b68ade580c328ad01ab4ea6b967d9",
+      "bytes": 1687
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T212631-001-widen-explore-graph-spacing-further.md",
+      "sha256": "a8965853245d88cac005c793c657340c4f80f4fa06adc51ab35943767e6b210e",
+      "bytes": 905
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T213248-001-restore-prior-explore-graph-spacing.md",
+      "sha256": "87a4a7810e92cc515de6f0afd8babcd108a80c71e3b89abda2862bb222133745",
+      "bytes": 593
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T213619-001-tighten-explore-graph-spacing-by-25-percent.md",
+      "sha256": "61a8ea1a20a8914e5943641356845d6c96d247047c3583b3ef740e2775df3422",
+      "bytes": 616
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T215624-001-finalize-user-tuned-explore-graph-spacing.md",
+      "sha256": "ab2a535851de182db813072c22f195f980712a42ee7dd58bd1231f1095966483",
+      "bytes": 928
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260725T220500-001-prepare-version-0-3-2-release-candidate.md",
+      "sha256": "ec2c5b9a00743ea2581b825c0da885582a635440ede69d927304322703956c64",
+      "bytes": 2113
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260726T123916-001-implement-operational-and-observable-belay-agent.md",
+      "sha256": "31946d933ca4f2359885a0e0e43c63e4931ff9333501aadff2b348b1bf7f8f75",
+      "bytes": 6621
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260729T204640-001-implement-agent-workflow-cleanup.md",
+      "sha256": "c7140ad23c8f97e9d4685e615d07ce005d0d45d0a326a0ced63f81e658745c64",
+      "bytes": 1552
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260729T215937-001-implement-route-mvp.md",
+      "sha256": "b24f9a20b1708c687fc61a0ee3b067e7fa48db71adc91e0e7b68b87a6957640c",
+      "bytes": 2719
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260730T180403-001-fix-pr-rust-ci-health-va.md",
+      "sha256": "bfffc3cfe4ab3006ebcd46149ae9ead6f614b6ba34e1aeb5dcee3f5f1c9e4ea7",
+      "bytes": 1322
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260730T191516-001-conversational-preview-a.md",
+      "sha256": "f9c919a572d582298bd4a2df6f88f51ac373b775905112612ce6bdb93f8415da",
+      "bytes": 912
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260801T212833-001-optimize-agent-workflow.md",
+      "sha256": "a82010419453ea340c1b0dc03d9588b797e885a49797fdd695ee04d5cb8dd08d",
+      "bytes": 1910
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260801T221657-001-configure-project-agents.md",
+      "sha256": "8570207486a7bd5b7100356a74c3824352f8295d421ac726f14faa3141dfc6f6",
+      "bytes": 1456
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260801T223214-001-configure-claude-agents.md",
+      "sha256": "522f41b2cdec7db9a5262f85eaca40ddc3baa8d1065d64ebd79d60afd2d3860d",
+      "bytes": 1633
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260817T094502-001-fragment-scoped-show.md",
+      "sha256": "4108fe6b1855c05818194a86cccfadd4baacad9d0acd95c5298478d0a05e2686",
+      "bytes": 1710
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260817T095130-001-plan-lint-structural-che.md",
+      "sha256": "b4c2424254baa578eab15bccce3f99735359bb2c39dafc2b29b1462f615bcefa",
+      "bytes": 2292
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260817T095933-001-task-section-docs-and-co.md",
+      "sha256": "46cf3ab8b29d433a42f6e2d6281d71459a59087d26d5cc778defd65ea20a6ee1",
+      "bytes": 2182
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260817T193324-001-library-status-include-e.md",
+      "sha256": "608e42725df3a230bf5a13a908f80f33e160a297509e244f1c155855d7bf6048",
+      "bytes": 1085
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260820T215745-001-retrieval-hygiene-impl.md",
+      "sha256": "a7fa8673154503025ff06479835e7f1de6df25e1ca7158f44e84721dadb7badc",
+      "bytes": 1007
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260826T215425-001-implement-task-derived-w.md",
+      "sha256": "4c39f6c97feaf82c7f2b851f69ba717b46a2db70cd8ecf9854662c743ba753f1",
+      "bytes": 547
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260901T093640-001-ndjson-evidence-show.md",
+      "sha256": "cc76af90e346cc95c151b88c06d8c29afe70305c2af0f11d1050e0b4536269cb",
+      "bytes": 664
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260901T095048-001-evd-fail-closed-bounds.md",
+      "sha256": "1651ecfa88d03cf394727d6903147445ea6174e00044a5e63f7aa5331a2d66b2",
+      "bytes": 567
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260901T095048-002-sync-evidence-index.md",
+      "sha256": "276303afe94c55f1c750b082de35c423c3b0b3de521ba88f3d3e10bdcbb2b298",
+      "bytes": 561
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260901T095048-003-docs-skill-contract.md",
+      "sha256": "0184798d51616e59737f0b78efa91095883c454dfadb91a2928ad34668655fc5",
+      "bytes": 540
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260906T191437-001-context-baseline-fixture.md",
+      "sha256": "7db6bc6c9dbb176683aeedbb8a5750350caf9965d07ebce5873fc6bfffc7ab40",
+      "bytes": 832
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260906T202725-001-dedupe-context-compile.md",
+      "sha256": "ace5e1ff7ea33f90bb68ae129775b261a0d8380f755a431b853f3cf16293ff30",
+      "bytes": 996
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260925T062148-001-streamline-skill-guidanc.md",
+      "sha256": "02b1ee70a9bc8b1ad716b8e4633f48555d2d9b7a7357942fc8095fc0d2d80e8b",
+      "bytes": 1152
+    },
+    {
+      "path": ".belay/entries/work/WRK-20260925T214846-001-implement-belay-guidance.md",
+      "sha256": "14110a0c0a177fc1b22ef7f9f87b871d43c85474a473dff4beb8e305923f9215",
+      "bytes": 1162
+    },
+    {
+      "path": ".belay/evidence/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": ".belay/evidence/2026-07.ndjson",
+      "sha256": "37e37e8d33cec755005286a92a27ab62e24cd20b2d52c0ec4badb8e67682ab07",
+      "bytes": 62579
+    },
+    {
+      "path": ".belay/evidence/2026-08.ndjson",
+      "sha256": "48120a4776082e8dfb8d8888e766f953b84e2d69ceb633bdfcc6b4c38bb8f831",
+      "bytes": 12379
+    },
+    {
+      "path": ".belay/evidence/2026-09.ndjson",
+      "sha256": "0fc80a6b422e38db00dad24f134861bad943ab16bcc19fa173cb990eb640bd90",
+      "bytes": 12038
+    }
+  ],
+  "state_storage_note": "Includes SQLite and other local state; not all files are proven regenerable caches."
+}

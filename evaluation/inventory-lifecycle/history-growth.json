@@ -1,0 +1,68 @@
+{
+  "scope": "Tracked snapshots only; not untracked working state or DB; no future growth extrapolation",
+  "samples": [
+    {
+      "requested_cutoff": "2026-07-01T00:00:00Z",
+      "commit": "8aa31e0ed90b7fdb5c2b0dbdf6f08c64f13f070d",
+      "commit_time": "2026-06-22T22:14:37+09:00",
+      "tracked": {}
+    },
+    {
+      "requested_cutoff": "2026-08-01T00:00:00Z",
+      "commit": "8c1f4c75eddf0bf8dd20e9a636a0d6fc0afd6574",
+      "commit_time": "2026-07-30T22:00:12+09:00",
+      "tracked": {
+        "other": {
+          "files": 6,
+          "bytes": 6
+        },
+        "entries": {
+          "files": 58,
+          "bytes": 208285
+        },
+        "evidence": {
+          "files": 1,
+          "bytes": 62579
+        }
+      }
+    },
+    {
+      "requested_cutoff": "2026-09-01T00:00:00Z",
+      "commit": "e58a1de89d4e776d2cfb6adcd0db3ffb67e7dd99",
+      "commit_time": "2026-08-26T22:52:36+09:00",
+      "tracked": {
+        "other": {
+          "files": 6,
+          "bytes": 6
+        },
+        "entries": {
+          "files": 86,
+          "bytes": 290550
+        },
+        "evidence": {
+          "files": 2,
+          "bytes": 74958
+        }
+      }
+    },
+    {
+      "requested_cutoff": "2026-09-27T00:00:00Z",
+      "commit": "9d4b16e341a23ee505fad1d2315fb389b892a298",
+      "commit_time": "2026-09-26T07:05:21+09:00",
+      "tracked": {
+        "other": {
+          "files": 6,
+          "bytes": 6
+        },
+        "entries": {
+          "files": 113,
+          "bytes": 337697
+        },
+        "evidence": {
+          "files": 3,
+          "bytes": 86996
+        }
+      }
+    }
+  ]
+}

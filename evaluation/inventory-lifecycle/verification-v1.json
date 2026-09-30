@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "review_snapshot_commit": "408be6c3017ceeb998adc760b2c666960ce8198c",
+  "binary_sha256": "1667342c8d2bb838d04dca0ad2db8e72847d590d2ab518d791341186c06b48a1",
+  "source_manifest": "product-manifest.json",
+  "checks": {
+    "rust_toolchain": "1.87.0",
+    "format": "pass",
+    "clippy": "pass",
+    "all_targets": {
+      "passed": 240,
+      "failed": 0
+    },
+    "browser": {
+      "passed": 1
+    },
+    "markdownlint": "18 files pass",
+    "typos": "pass",
+    "isolated_deploy_helper": "pass",
+    "patch_reverse_check": "pass",
+    "authored_report_lint": "pass; imported raw canonical-plan.md preserved verbatim and excluded after its formatting warnings were recorded"
+  },
+  "independent_review": {
+    "storage_inventory": "pass at540c613",
+    "context_scope_guidance": "behavior pass at7fa7884; sole README link finding resolved by fresh pass at408be6c",
+    "documentation_link": "pass at408be6c"
+  },
+  "limitations": [
+    "Root first full test run had one revision assertion failure; same code after recompilation and six independent runs passed. Cause Unknown; failed log retained.",
+    "No root commit or external publication; review snapshot resides in an isolated clone. Root Git-based Evidence freshness can remain unresolved.",
+    "Actual selected-data archive remains pending human choice.",
+    "Context numerical fixtures pass; lifecycle v1 runtime fails. No formal0.7.0 adoption."
+  ],
+  "report_hashes": {
+    "context-acceptance-v1.json": "dccd8af69e63dfc10c650e33a0623a3cbf3bdf84b167c96fcd86c677ca8be5dd",
+    "storage-acceptance-v1.json": "55fd6d50c05cad83d31ca0ed8ceb0cd6486f76594d36203df416f06cdd44bdf4",
+    "lifecycle-acceptance-v1.json": "d407dc53020dc7e9eefc51837afc2e3d19d975e6b5e034128cdf409f500af40a",
+    "summary-acceptance-v1.json": "e0e99b51c4a7afc09913b6a46eb9e14064fbf845ccc4ebcb7ddfbb4e1aba94e6",
+    "final-performance-v1.json": "64002ad181d3686cf0e6a3f970928d0c41573af028f5b13b0a756a2632274498"
+  },
+  "validation_log_hashes": {
+    "validation/acceptance-clippy.log": "350883a9b00c1b3df252a8979f753c040e3c24a61074f00168c0584b0c0fdbfb",
+    "validation/acceptance-release.log": "067a4ed4007356e6db4350e100f37f3e287eb2f14443f5766e10eeef2c447816",
+    "validation/acceptance-tests.log": "47bd222d80fa754750e0fcb1cab244e1c24ed1d984184373a3c51778be7d5d48",
+    "validation/archive-final.log": "732887f0e18111015fed7cd1a8225f205933b6ff8b47869c3823f7f4168eb86b",
+    "validation/authored-report-lint.log": "55a5518a954f9bd48bdf9bd21598bbf38135f2e4be2d43817929415102fc1c2a",
+    "validation/browser-acceptance.log": "82593ecf844048c14a88b2d2081e1a42ae505dec32ccfe25a0f0ad4b24a78ae1",
+    "validation/browser-tests-final.log": "bc6dede1530b598e21300266dbed827fc0060c952e557218548c586051e25041",
+    "validation/context-acceptance.log": "107ad595cd5be1f867457d317001ab70742e71be2275e2c27fadefb32775c801",
+    "validation/context-final-benchmark.log": "1aaab0cab74a81e3d648578477756cd9fe488151f6b00e65c8770f5c94f70d37",
+    "validation/deploy-final.log": "31fd6d5442a6ee45c37ff6af01dc594e8c6963b4e540b97bb1c2771fde9aad49",
+    "validation/final-clippy-rebuilt.log": "6ad157da4968ba5c78d37c5c1a189c60121d951e6b89b7a7fc2cf01875667213",
+    "validation/final-release-build.log": "30fdc782bef81c7617e7650bbcef6fbbb19d488abd47087acc42991c15049f65",
+    "validation/final-tests-rebuilt.log": "62cc573c9f61f88bd93f1bf37682260e3043a3d1380f58b0cdee6ab46c0e0278",
+    "validation/final-tests.log": "b8fbcf2a9132e711c458bc1d23cc0bb0da409894e38c03983c355a3c60fdfc95",
+    "validation/inventory-scale-final.log": "3699c149df57f38bca67cdf8862852959446bd84a83f0aa86c709d14a455d055",
+    "validation/lifecycle-acceptance.log": "e3a78fa87b99e3e152e4cdfc1ae93f78b5c8d75c87158ef55223e8171e4684e6",
+    "validation/lifecycle-final.log": "94c860c770b1452830375cdc03bbfc33ee0571ce2b8be0a883512774a48e8a5f",
+    "validation/markdownlint-final.log": "b439dbd2702e147320f4fabc1d393fe59c07f63bb34bb689678b15694b88eb45",
+    "validation/markdownlint.log": "b439dbd2702e147320f4fabc1d393fe59c07f63bb34bb689678b15694b88eb45",
+    "validation/report-lint.log": "882c29addacd95e0344187c91337e79c2d6825c2b4e6b64217594bb62e5a4289",
+    "validation/revision-recheck.log": "60515247f65918f68660d04bed13bc5ea4e960060584ad79191b7382ae1b01e5",
+    "validation/root-doctor-final.log": "9f9cf4eb2a6d557d1972177706722bdb8bafcb3b6976296b110b6469c7ccd0d3",
+    "validation/storage-acceptance.log": "1a93cd1f1f52033374a9fd2cf2f22f330ba99770e105440cdb61940d2ee0efef",
+    "validation/storage-control-final.log": "c21a564dfe820bab332c11cca9b76ce806593e6a78a8aa5281ea5f85ce1362f1",
+    "validation/storage-final-benchmark.log": "7871a27581e10c261da8c6408f7e06daae2d6c6d44e6404d9f1b594b7ccfeda8",
+    "validation/summary-acceptance.log": "4318cde567473b9f77f2fc11805ee3dc4f564ceb3ba5ef8aa0f63207fff4dea6",
+    "validation/summary-final.log": "4318cde567473b9f77f2fc11805ee3dc4f564ceb3ba5ef8aa0f63207fff4dea6",
+    "validation/typos-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/typos.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "compiled_source_snapshot": "7fa7884bf56dd28809c447351c30ddb7ad4b17bc",
+  "post_build_change": "README link only",
+  "root_diagnostics": {
+    "command": "installed belay doctor",
+    "exit": 0,
+    "drift_reported": true,
+    "note": "Installed CLI read-only diagnostic, not a new-source acceptance test; pre-existing freshness/Goal-section warnings remain and SQLite/Markdown drift is none."
+  }
+}

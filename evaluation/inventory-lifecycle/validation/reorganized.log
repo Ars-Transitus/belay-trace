@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "evaluation": "evaluation-v1.md",
+  "base_commit": "9d4b16e341a23ee505fad1d2315fb389b892a298",
+  "selected_archive_id": "WRK-20260712T165103-001-implement-phase-6-1-agent-first-delivery-assuran",
+  "binary_sha256": {
+    "old": "75abf49f8091d44f625d40df370a3d3badfd91a4efdd048c3d4caa6a3f827fd0",
+    "new": "1667342c8d2bb838d04dca0ad2db8e72847d590d2ab518d791341186c06b48a1"
+  },
+  "summary": {
+    "old": {
+      "median_seconds": 0.52324074995704,
+      "tokens": 8537,
+      "retrieval_commands": 7,
+      "missing": {}
+    },
+    "new": {
+      "median_seconds": 0.5482378739397973,
+      "tokens": 5585,
+      "retrieval_commands": 5,
+      "missing": {}
+    }
+  },
+  "comparison": {
+    "token_reduction": 0.3457889188239428,
+    "runtime_ratio": 1.0477736567436877,
+    "search_count_ok": true,
+    "required_information_ok": true,
+    "limitation": "Scripted retrieval only; semantic/adversarial quality checks are separate gates."
+  }
+}

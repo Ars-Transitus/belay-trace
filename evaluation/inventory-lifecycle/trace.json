@@ -1,0 +1,41 @@
+{
+  "goal": "GOAL-20260930T220628-001-inventory-lifecycle-rele",
+  "plan": "PLN-20260930T220628-001-inventory-lifecycle-deli",
+  "works": {
+    "context": {
+      "t-004": "WRK-20260930T220808-001-t004-context",
+      "t-009": "WRK-20260930T220808-002-t009-context",
+      "t-010": "WRK-20260930T220808-003-t010-context",
+      "t-011": "WRK-20260930T220808-004-t011-context"
+    },
+    "inventory": {
+      "t-002": "WRK-20260930T220808-005-t002-inventory",
+      "t-005": "WRK-20260930T220808-006-t005-inventory",
+      "t-006": "WRK-20260930T220808-007-t006-inventory",
+      "t-007": "WRK-20260930T220808-008-t007-inventory",
+      "t-017": "WRK-20260930T220808-009-t017-inventory",
+      "t-023": "WRK-20260930T220808-010-t023-inventory"
+    },
+    "storage": {
+      "t-014": "WRK-20260930T220808-011-t014-storage",
+      "t-015": "WRK-20260930T220808-012-t015-storage",
+      "t-016": "WRK-20260930T220808-013-t016-storage",
+      "t-019": "WRK-20260930T220808-014-t019-storage",
+      "t-020": "WRK-20260930T220808-015-t020-storage",
+      "t-021": "WRK-20260930T220808-016-t021-storage",
+      "t-022": "WRK-20260930T220808-017-t022-storage"
+    }
+  },
+  "final_evidence": {
+    "integrated_checks": "EVD-20260930T235616-001",
+    "lifecycle_integrity": "EVD-20260930T235644-001",
+    "lifecycle_runtime": "EVD-20260930T235644-002",
+    "storage_review": "EVD-20260930T235644-003",
+    "context_and_guidance_review": "EVD-20261001T000108-001"
+  },
+  "release_authorization": "EVD-20261001T061525-001",
+  "release_evidence": "EVD-20261001T062236-001",
+  "release_work": "WRK-20261001T061826-001-finalize-070-readiness",
+  "release_decision": "DEC-20261001T061826-001-accept-storage-latency",
+  "goal_completion_evidence": "EVD-20261001T062341-001"
+}

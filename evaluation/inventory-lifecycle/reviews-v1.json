@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "authority": "local independent Codex review callbacks; no PR/MR publication authorized or claimed",
+  "reviews": [
+    {
+      "reviewer": "/root/review_inventory_deploy",
+      "input_commit": "e20567556f9c15403595e0ac8429615e39086e19",
+      "scope": [
+        "inventory",
+        "summary",
+        "local deploy"
+      ],
+      "verdict": "changes-requested",
+      "findings": [
+        {
+          "priority": 1,
+          "issue": "stale/missing Decision originals retained indexed explicit-scope",
+          "resolution_commit": "f1c0f46efd6803bf93daa5e70fe3e62d051d936c",
+          "status": "fixed; fresh integrated review pending"
+        },
+        {
+          "priority": 2,
+          "issue": "unindexed loose originals omitted from type/status/age/Plan classification",
+          "resolution_commit": "f1c0f46efd6803bf93daa5e70fe3e62d051d936c",
+          "status": "fixed; fresh integrated review pending"
+        }
+      ],
+      "other_scoped_findings": []
+    },
+    {
+      "reviewer": "/root/review_context",
+      "input_commit": "66810034ce1f7b06e8aeb9937ac1ab0aebfb0ab0",
+      "scope": [
+        "context compiler",
+        "section renderer",
+        "summary prose integration"
+      ],
+      "verdict": "changes-requested",
+      "findings": [
+        {
+          "priority": 1,
+          "issue": "nested Task subsections omitted from successful focus packet",
+          "status": "fixed and independently confirmed in review of 2085564; subsequent fragment-seed regression tracked separately",
+          "resolution_commit": "208556429fe190cea19bc1fef01ddc0e1c1f9fc5"
+        },
+        {
+          "priority": 2,
+          "issue": "recognized other Goal scope Decision included as explicit-scope without scope disclosure",
+          "status": "fixed and independently confirmed in review of 2085564; subsequent fragment-seed regression tracked separately",
+          "resolution_commit": "208556429fe190cea19bc1fef01ddc0e1c1f9fc5"
+        }
+      ]
+    },
+    {
+      "reviewer": "/root/review_storage_inventory",
+      "input_commit": "39668e995c2a8a3849e1d8485bd2708d54b3f405",
+      "scope": [
+        "storage",
+        "inventory",
+        "summary persistence",
+        "CLI source verification hooks"
+      ],
+      "verdict": "changes-requested",
+      "independent_checks_passed": 40,
+      "findings": [
+        {
+          "priority": 1,
+          "issue": "restored identical loose/pack twin loses revision during missing-index sync, then reopened revision collides",
+          "status": "fixed and independently confirmed in review of f7f54c7; subsequent mutable-edit regression tracked separately",
+          "resolution_commit": "f7f54c7563e9c62acb85a6249607c376b395b64e"
+        },
+        {
+          "priority": 2,
+          "issue": "Plan graph lint treats raw-present unindexed Goal as missing",
+          "status": "fixed and independently confirmed in review of f7f54c7; subsequent mutable-edit regression tracked separately",
+          "resolution_commit": "f7f54c7563e9c62acb85a6249607c376b395b64e"
+        }
+      ]
+    },
+    {
+      "reviewer": "/root/review_context_fixed",
+      "input_commit": "208556429fe190cea19bc1fef01ddc0e1c1f9fc5",
+      "scope": [
+        "nested Task and Decision scope fix"
+      ],
+      "verdict": "changes-requested",
+      "prior_findings": "nested Task loss and other Goal scope probes now pass",
+      "findings": [
+        {
+          "priority": 2,
+          "issue": "canonical fragment seed incorrectly excludes adopted parent Goal scoped Decision",
+          "status": "fixed; fresh review pending",
+          "resolution_commit": "0873a774924c66b84cd027dc50f04f8f80ef9c0f"
+        }
+      ]
+    },
+    {
+      "reviewer": "/root/review_storage_fixed",
+      "input_commit": "f7f54c7563e9c62acb85a6249607c376b395b64e",
+      "scope": [
+        "storage revision recovery",
+        "inventory original-union reference validation"
+      ],
+      "verdict": "changes-requested",
+      "independent_checks_passed": 36,
+      "prior_findings": "restored twin/missing-index recovery and unindexed Goal probes now pass",
+      "findings": [
+        {
+          "priority": 2,
+          "issue": "editing reopened mutable loose Entry with older pack history leaves revision unchanged",
+          "status": "fixed and independently confirmed at540c613",
+          "resolution_commit": "540c613c605cce6c93ff5894071b2d2336d4f204"
+        }
+      ]
+    },
+    {
+      "reviewer": "/root/review_storage_final",
+      "input_commit": "540c613c605cce6c93ff5894071b2d2336d4f204",
+      "scope": [
+        "src/reconcile.rs",
+        "src/inventory.rs",
+        "tests/lifecycle_storage.rs",
+        "tests/inventory_summary.rs"
+      ],
+      "verdict": "pass",
+      "independent_checks_passed": 235,
+      "focused_checks": {
+        "lifecycle": 20,
+        "inventory": 17,
+        "repeated_revision_regression": 6
+      },
+      "findings": [],
+      "limitation": "Root first full run failed expected revision4/got3 once; same source after recompilation passed240. Independent clone failed to reproduce in6 runs. Cause Unknown; both root logs retained."
+    },
+    {
+      "reviewer": "/root/review_context_final",
+      "input_commit": "4679a422f9cfcb2e1d4df2dcf743ecd791f04108",
+      "scope": [
+        "context explicit-seed scope",
+        "source skill guidance"
+      ],
+      "verdict": "changes-requested",
+      "findings": [
+        {
+          "priority": 1,
+          "issue": "free-text match on parent Goal broadens explicit Task/criterion seed and admits sibling criterion Decision as within selected scope",
+          "status": "fixed and independently confirmed at7fa7884",
+          "resolution_commit": "7bb2cf98642af73baa8226996c2a6ccdb58b271b"
+        }
+      ],
+      "other_scoped_findings": [],
+      "harness_observations": "Reviewer clone inherited older CLI tests with two stale expectations; root final CLI suite has corrected export output argument and actual fallback excerpt and passed3/3."
+    },
+    {
+      "reviewer": "/root/review_scope_final",
+      "input_commit": "7fa7884bf56dd28809c447351c30ddb7ad4b17bc",
+      "scope": [
+        "context explicit seed precedence",
+        "Evidence help and source guidance"
+      ],
+      "verdict": "changes-requested",
+      "behavior_review": "No scoped behavior regression; context14 plus4 focused Evidence checks pass",
+      "findings": [
+        {
+          "priority": 2,
+          "issue": "README linked evaluation checkpoint omitted from exact review snapshot",
+          "status": "fixed and independently confirmed at408be6c",
+          "resolution_commit": "408be6c3017ceeb998adc760b2c666960ce8198c"
+        }
+      ]
+    },
+    {
+      "reviewer": "/root/review_doc_link",
+      "input_commit": "408be6c3017ceeb998adc760b2c666960ce8198c",
+      "scope": [
+        "README.md link only"
+      ],
+      "verdict": "pass",
+      "checks": [
+        "exact diff1insertion1deletion",
+        "linked release notes tracked in sameSHA",
+        "candidate and formal release gates accurately disclosed",
+        "diff-check",
+        "clean exactHEAD"
+      ],
+      "findings": []
+    },
+    {
+      "reviewer": "/root/review_release_070",
+      "input_commit": "52e1ba3a0a8c2488e848eebbcf121a18abee812c",
+      "verdict": "pass",
+      "scope": [
+        "own package version",
+        "release docs and v2 exception",
+        "selected archive validation",
+        "reorganized comparison procedure"
+      ],
+      "findings": [],
+      "note": "Historical frozen logs contain trailing blank lines; preserved verbatim, no acceptance impact."
+    }
+  ]
+}

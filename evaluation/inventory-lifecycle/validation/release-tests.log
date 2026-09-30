@@ -1,0 +1,290 @@
+   Compiling belay-trace v0.7.0 (/Users/ars/dev/repo/github.com/Ars-Transitus/belay-trace)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.64s
+     Running unittests src/lib.rs (target/debug/deps/belay_trace-386d66ae5a6e249c)
+
+running 89 tests
+test browse::tests::url_codec_does_not_turn_path_data_into_routing_segments ... ok
+test agent::tests::malformed_markers_are_rejected ... ok
+test agent::tests::managed_section_append_and_replace_preserve_unrelated_content ... ok
+test browse::tests::explicit_goal_ids_do_not_emit_legacy_aliases ... ok
+test browse::tests::goal_success_criteria_receive_canonical_anchors ... ok
+test browse::tests::fully_qualified_references_are_linked_but_code_is_not ... ok
+test browse::tests::sanitizer_removes_active_content_images_and_dangerous_urls ... ok
+test browse::tests::delivery_map_task_and_goal_items_are_links_and_state_is_a_badge ... ok
+test cli::tests::invalid_invocation_uses_clap_usage_exit_category ... ok
+test cli::tests::sync_id_and_preference_are_coupled ... ok
+test cli::tests::add_requires_exactly_one_body_source ... ok
+test context::tests::evidence_truncation_keeps_ordered_list_marker_and_query ... ok
+test context::tests::evidence_truncation_keeps_task_list_state ... ok
+test context::tests::truncation_uses_boundaries_and_obeys_the_estimator ... ok
+test context::tests::evidence_units_preserve_lists_and_sentence_boundaries ... ok
+test context_sections::tests::equal_order_is_stable_and_duplicate_ids_fail ... ok
+test context_sections::tests::required_packet_is_whole_or_failure_with_shortfall ... ok
+test context_sections::tests::optional_omissions_and_sources_are_identical_between_formats ... ok
+test entry::tests::display_id_parser_rejects_noncanonical_sequences ... ok
+test entry::tests::entry_reference_parser_canonicalizes_fragment_case ... ok
+test entry::tests::slug_generation_is_stable_and_has_a_fallback ... ok
+test entry::tests::type_specific_statuses_are_validated ... ok
+test evidence::tests::evidence_query_shape_is_prefix_based_and_ignores_entry_ids ... ok
+test evidence::tests::matching_head_takes_precedence_over_evidence_age ... ok
+test agent::tests::safe_write_preserves_permissions_and_rejects_concurrent_changes ... ok
+test evidence::tests::time_fallback_does_not_claim_invalid_or_future_evidence_is_fresh ... ok
+test evidence::tests::time_fallback_is_inclusive_and_applies_when_git_or_commit_is_unavailable ... ok
+test evidence::tests::show_resolves_exact_id_from_ndjson_without_sqlite ... ok
+test evidence::tests::time_fallback_preserves_subsecond_precision_at_the_boundary ... ok
+test database::tests::bundled_sqlite_supports_fts5_and_bm25 ... ok
+test git_provenance::tests::git_commands_explicitly_remove_repository_and_behavior_overrides ... ok
+test database::tests::migration_rejects_non_contiguous_history_without_rerunning_ddl ... ok
+test database::tests::migration_is_idempotent_and_uses_integer_entry_ids ... ok
+test database::tests::migration_two_rebuilds_a_version_one_fts_index ... ok
+test markdown::tests::chunks_follow_markdown_sections_and_use_documented_estimator ... ok
+test evidence::tests::unique_prefix_resolves_one_evidence_record ... ok
+test markdown::tests::chunks_preserve_paragraph_and_list_boundaries ... ok
+test markdown::tests::parser_preserves_display_identity_for_rebuilds ... ok
+test markdown::tests::hash_uses_normalized_content_and_ignores_managed_revision_fields ... ok
+test markdown::tests::parser_rejects_metadata_arrays_and_unknown_fields ... ok
+test markdown::tests::parser_rejects_nested_metadata_and_future_schema ... ok
+test markdown::tests::render_is_deterministic_and_round_trips_without_internal_ids ... ok
+test entry::tests::allocator_skips_database_and_mirror_collisions ... ok
+test entry::tests::concurrent_allocators_reserve_distinct_sequences ... ok
+test evidence::tests::show_fails_closed_for_fragment_zero_ambiguous_duplicate_and_malformed ... ok
+test repository::tests::init_rejects_symlinked_belay_directory ... ok
+test repository::tests::init_rejects_symlinked_managed_files ... ok
+test repository::tests::init_rejects_symlinked_managed_subdirectories ... ok
+test repository::tests::discovery_does_not_cross_a_nested_repository_boundary ... ok
+test repository::tests::init_is_idempotent_and_discovers_from_nested_directories ... ok
+test browse::tests::snapshot_is_read_only_and_search_matches_the_cli_connection_path ... ok
+test browse::tests::library_status_filter_lists_every_status_and_honors_exclude_mode ... ok
+test route::tests::preview_hash_ignores_only_the_embedded_hash ... ok
+test route::tests::run_ids_reject_path_traversal ... ok
+test search::tests::excerpt_is_compact_and_bounded ... ok
+test search::tests::overlapping_status_include_and_exclude_are_rejected ... ok
+test search::tests::plain_queries_are_escaped_as_fts_terms ... ok
+test repository::tests::repeated_init_repairs_required_gitignore_entries ... ok
+test pack::tests::changed_source_after_journal_stays_loose_and_conflicting ... ok
+test route::tests::interrupted_apply_rejects_coverage_basis_drift ... ok
+test route::tests::interrupted_apply_reconstructs_changed_and_unchanged_link_receipts ... ok
+test search::tests::status_include_and_exclude_filter_structured_results ... ok
+test route::tests::interrupted_apply_rejects_receipt_external_inbound_changes_for_mutable_targets ... ok
+test trace_ids::tests::ambiguous_fragment_has_no_definition ... ok
+test trace_ids::tests::delivery_map_detection_is_independent_of_task_rows ... ok
+test trace_ids::tests::delivery_map_rows_expose_columns_belay_does_not_mandate ... ok
+test trace_ids::tests::distributed_evidence_references_use_the_same_validator_as_storage ... ok
+test trace_ids::tests::duplicate_local_ids_are_ambiguous_and_do_not_resolve ... ok
+test trace_ids::tests::entry_types_without_a_fragment_standard_have_no_definition ... ok
+test trace_ids::tests::goal_findings_require_unique_fixed_width_ids ... ok
+test trace_ids::tests::goal_fragment_definition_keeps_the_whole_wrapped_item ... ok
+test trace_ids::tests::goal_fragments_include_only_canonical_anchors ... ok
+test store::tests::expected_revision_is_checked_inside_status_mutation ... ok
+test trace_ids::tests::nested_goal_details_do_not_define_criteria ... ok
+test trace_ids::tests::plan_findings_require_unique_fixed_width_ids ... ok
+test trace_ids::tests::plan_fragment_definition_is_the_delivery_map_row ... ok
+test trace_ids::tests::plan_fragments_include_only_canonical_task_anchors ... ok
+test trace_ids::tests::reference_fragments_require_fixed_width_canonical_ids ... ok
+test trace_ids::tests::reference_spans_find_entries_fragments_and_evidence ... ok
+test store::tests::incomplete_and_completed_unpublished_evidence_remain_invisible ... ok
+test git_provenance::tests::only_evidence_commits_are_allowed_and_unavailable_values_are_explicit ... ok
+test store::tests::directory_sync_failure_leaves_markdown_for_recovery_and_rolls_back_sqlite ... ok
+test store::tests::route_create_receipt_replays_the_same_entry ... ok
+test store::tests::replacement_restores_the_original_when_expected_mirror_hash_does_not_match ... ok
+test git_provenance::tests::oversized_content_and_diff_are_reported_not_silently_buffered ... ok
+test pack::tests::each_interrupted_phase_recovers_exact_originals ... ok
+test git_provenance::tests::merge_uses_first_parent_and_gitlink_is_metadata_only ... ok
+test context::tests::batch_freshness_matches_authoritative_counts_across_branches_and_missing_objects ... ok
+test git_provenance::tests::root_normal_rename_delete_and_special_contents_are_bounded ... ok
+
+test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+
+     Running unittests src/main.rs (target/debug/deps/belay-7b73968f47980eff)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/browse_http.rs (target/debug/deps/browse_http-339fe4a77d538b55)
+
+running 2 tests
+test browse_http_security_atomic_reload_and_repository_invariance ... ok
+test successful_reload_swaps_to_the_new_complete_generation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/cli.rs (target/debug/deps/cli-46217154f2c39f43)
+
+running 95 tests
+test cli_version_matches_the_package_and_lockfile ... ok
+test browse_help_is_loopback_only_and_uninitialized_is_exit_three ... ok
+test add_rejects_a_symlinked_managed_parent_without_external_write ... ok
+test browse_fixed_port_bind_failure_is_exit_six ... ok
+test agent_integration_rejects_symlinks_and_non_regular_files ... ok
+test archived_entries_are_hidden_from_default_search_and_visible_with_opt_in ... ok
+test archive_candidates_lists_completed_unlinked_work ... ok
+test context_focus_prints_a_task_packet_without_sibling_tasks ... ok
+test concurrent_searches_reject_non_contiguous_migration_history ... ok
+test batch_sync_reports_conflict_after_completing_independent_entries ... ok
+test batch_sync_reports_completed_entries_before_a_storage_failure ... ok
+test context_keeps_late_matching_evidence_under_a_small_budget ... ok
+test doctor_help_separates_repository_state_from_runtime_observations ... ok
+test context_rejects_a_budget_too_small_for_attributed_output ... ok
+test context_prefers_text_matches_over_heading_only_matches ... ok
+test context_preserves_late_match_when_truncating_one_long_sentence ... ok
+test context_truncates_oversized_minimum_evidence_instead_of_dropping_the_entry ... ok
+test every_command_help_has_the_required_structure ... ok
+test context_without_a_task_emits_the_working_set_and_next_index ... ok
+test concurrent_writers_serialize_without_losing_entries_or_drifting ... ok
+test concurrent_mutations_of_one_entry_leave_a_consistent_result ... ok
+test context_selects_breadth_before_expanding_oversized_top_evidence ... ok
+test context_is_linked_source_attributed_and_within_the_estimated_budget ... ok
+test help_documents_evidence_show_and_index_contracts ... ok
+test doctor_rejects_missing_operational_fts_table ... ok
+test doctor_classifies_generated_and_agents_drift_and_malformed_markers ... ok
+test doctor_reports_sync_drift_temporary_files_and_invalid_mirrors ... ok
+test generated_skill_documents_working_set_focus_and_archive_candidates ... ok
+test doctor_reports_generated_active_inactive_stale_and_missing_agent_states ... ok
+test init_is_idempotent_and_does_not_modify_agents_md ... ok
+test failed_mirror_replacement_rolls_back_sqlite_mutation ... ok
+test export_rejects_managed_mirror_destinations_and_is_deterministic ... ok
+test invalid_config_uses_validation_exit_category ... ok
+test add_supports_every_type_and_body_source ... ok
+test evidence_status_orders_offset_timestamps_by_instant ... ok
+test install_claude_skill_is_explicit_repository_scoped_and_idempotent ... ok
+test init_reset_state_atomically_rebuilds_from_tracked_markdown ... ok
+test export_writes_parseable_filtered_snapshots_without_internal_ids ... ok
+test install_codex_skill_is_explicit_repository_scoped_and_idempotent ... ok
+test install_rejects_a_symlinked_route_reference_directory_without_writing_elsewhere ... ok
+test invalid_add_does_not_allocate_or_write ... ok
+test newer_database_schema_uses_validation_exit_category ... ok
+test goal_verify_coverage_and_compile_work_together ... ok
+test link_and_status_validation_do_not_mutate_entries ... ok
+test install_skill_option_is_repeatable_for_multiple_explicit_targets ... ok
+test plan_lint_passes_a_conforming_plan_and_tolerates_extra_fields ... ok
+test plan_lint_reports_a_task_row_no_section_explains ... ok
+test project_command_does_not_recreate_a_missing_database ... ok
+test plan_lint_matches_goal_lint_interface_shape ... ok
+test plan_lint_reports_missing_baseline_fields_and_unknown_states ... ok
+test plan_lint_skips_a_plan_with_no_delivery_map ... ok
+test repeated_init_refreshes_generated_assets_without_activating_them ... ok
+test rebuild_validation_failure_preserves_existing_database ... ok
+test links_and_evidence_require_defined_goal_and_plan_fragments ... ok
+test rebuild_upgrades_a_pre_route_schema_without_receipts ... ok
+test search_rejects_non_contiguous_migration_history ... ok
+test route_rejects_a_symlinked_state_root_without_external_write ... ok
+test rebuild_restores_entries_links_search_and_sync_baselines ... ok
+test show_and_status_resolve_unique_prefix_and_slug ... ok
+test search_supports_repeated_status_include_and_exclude ... ok
+test search_supports_exact_id_structured_filters_and_bm25_deduplication ... ok
+test state_changing_command_help_has_realistic_examples_and_exit_categories ... ok
+test show_evidence_prefix_and_error_boundaries_are_fail_closed ... ok
+test route_commands_reject_a_stale_input ... ok
+test show_rejects_a_fragment_instead_of_falling_back_to_the_entry ... ok
+test show_rejects_an_ambiguous_slug ... ok
+test show_reports_a_resolvable_fragment_that_has_no_body_section ... ok
+test show_link_and_status_use_display_ids_and_keep_mirror_in_sync ... ok
+test show_resolves_mirror_only_evidence_without_mutating_state ... ok
+test show_with_a_fragment_returns_one_task_instead_of_the_entry ... ok
+test sync_accepts_nested_path_only_rename_without_revision_churn ... ok
+test sync_accepts_a_link_that_targets_a_task_fragment ... ok
+test sync_imports_markdown_only_changes_and_normalizes_managed_fields ... ok
+test sync_and_rebuild_preserve_existing_evidence_index_on_invalid_mirrors ... ok
+test top_level_help_describes_commands_workflow_and_exit_categories ... ok
+test uninitialized_project_command_fails_without_mutation_and_suggests_init ... ok
+test sync_imports_mutually_linked_new_markdown_entries_without_order_dependency ... ok
+test sync_rejects_duplicate_and_ambiguous_unbaselined_entries_without_overwrite ... ok
+test sync_does_not_repair_links_from_markdown_before_conflict_classification ... ok
+test sync_imports_new_markdown_and_restores_missing_counterparts ... ok
+test update_script_refuses_to_initialize_without_explicit_opt_in ... ok
+test sync_indexes_mirror_only_evidence_and_rebuild_reports_separate_counts ... ok
+test status_accepts_an_allowed_value_for_every_entry_type ... ok
+test sync_suppresses_unchanged_details_and_summarizes_them ... ok
+test sync_renders_sqlite_only_changes_and_resolves_both_preferences ... ok
+test update_agents_appends_replaces_and_stabilizes_only_the_managed_section ... ok
+test sync_restores_deleted_sqlite_targets_without_propagating_link_deletion ... ok
+test update_agents_creates_missing_file_and_rejects_malformed_markers ... ok
+test time_based_freshness_drives_status_doctor_and_coverage_without_git_metadata ... ok
+test unsynchronized_markdown_is_not_overwritten_by_status_or_link ... ok
+test update_script_refreshes_only_previously_active_integrations ... ok
+test work_create_derives_goal_links_and_supports_machine_output ... ok
+test work_create_rejects_invalid_and_ambiguous_task_mappings_without_creating_work ... ok
+test work_create_uses_fully_qualified_goal_item_for_multi_goal_plan ... ok
+test route_cli_materializes_only_the_exact_accepted_preview_and_retries_idempotently ... ok
+
+test result: ok. 95 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.14s
+
+     Running tests/cli_inventory_lifecycle.rs (target/debug/deps/cli_inventory_lifecycle-a1529485214a630b)
+
+running 3 tests
+test inventory_cli_is_read_only_and_status_restore_is_explicit ... ok
+test summary_cli_preserves_provenance_and_marks_changed_sources_stale ... ok
+test lifecycle_cli_preserves_sources_across_pack_rebuild_restore_and_reopen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+
+     Running tests/context_sections.rs (target/debug/deps/context_sections-97b61596d7baf2bb)
+
+running 14 tests
+test malformed_original_evidence_is_not_silently_treated_as_missing ... ok
+test focus_refuses_unsynced_plan_and_goal_boundaries ... ok
+test long_last_boundaries_fail_without_silent_partial_packet ... ok
+test focus_preserves_plan_goal_task_boundary_and_all_evidence_or_fails ... ok
+test live_empty_archive_blocked_and_completion_do_not_claim_verification_or_authority ... ok
+test ambiguous_mapping_fails_and_unmapped_legacy_packet_is_unknown ... ok
+test focus_duplicate_task_heading_or_mapping_fails_closed ... ok
+test query_selection_ignores_unrelated_new_failure_and_is_deterministic ... ok
+test human_decision_scope_is_preserved_with_unknown_current_applicability ... ok
+test decisions_need_scope_adoption_and_no_superseding_or_conflicting_acceptance ... ok
+test stale_or_missing_decision_original_never_keeps_an_applicability_claim ... ok
+test focus_retains_nested_task_markdown_and_rejects_required_overflow ... ok
+test canonical_decision_scope_excludes_linked_outside_decisions_and_discloses_seed_override ... ok
+test fragment_seeds_keep_parent_goal_policies_without_admitting_sibling_criteria ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.79s
+
+     Running tests/inventory_summary.rs (target/debug/deps/inventory_summary-944ea5e15d1f2eda)
+
+running 17 tests
+test loose_original_missing_from_index_is_visible_without_mutation ... ok
+test missing_original_index_drift_and_unconfirmed_decision_are_distinct ... ok
+test cache_preview_excludes_originals_and_preserves_receipts_on_rebuild ... ok
+test original_revision_only_drift_has_current_binding_and_unconfirmed_adoption ... ok
+test packed_original_missing_from_index_retains_counts_and_provenance ... ok
+test evidence_sources_bind_and_fixed_time_detects_stale_and_invalid_task_map ... ok
+test read_only_deterministic_report_same_human_json_findings ... ok
+test plan_graph_uses_raw_goal_even_when_goal_and_plan_are_unindexed ... ok
+test summary_detects_raw_only_source_change ... ok
+test status_preview_stale_retry_restore_and_tamper ... ok
+test summary_no_clobber_stale_missing_and_authority ... ok
+test scoped_decisions_require_adoption_and_matching_scopes_only_propose_conflicts ... ok
+test unindexed_live_original_retains_type_status_age_and_finding_identity ... ok
+test unindexed_plan_runs_original_task_map_validation ... ok
+test changed_deleted_or_invalid_decision_cannot_reuse_indexed_adoption ... ok
+test stale_or_missing_successor_cannot_replace_current_decision ... ok
+test inventory_large_fixture_measurement ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.24s
+
+     Running tests/lifecycle_storage.rs (target/debug/deps/lifecycle_storage-ec461b861523e495)
+
+running 20 tests
+test active_work_and_goals_never_pack ... ok
+test appended_month_after_preview_remains_intact ... ok
+test independent_ids_and_schema_upgrade ... ok
+test new_writer_after_preview_is_not_retired ... ok
+test raw_hash_conflict_and_identical_placement_dedup ... ok
+test corrupt_pack_and_missing_pack_fail_closed ... ok
+test independent_compactors_serialize_and_retry_same_snapshot ... ok
+test live_work_reopens_without_overwriting_pack_revision ... ok
+test evidence_compaction_restore_and_rebuild ... ok
+test stale_preview_preserves_changed_original ... ok
+test saved_unindexed_repairs_without_new_id ... ok
+test symlink_original_and_pack_directory_rejected ... ok
+test unavailable_index_preserves_record_from_original_target ... ok
+test legacy_full_and_partial_month_preserve_exact_bytes ... ok
+test sync_recovers_exact_packed_revision_without_resetting_history ... ok
+test unknown_pack_schema_rejected_and_external_logs_not_claimed_preserved ... ok
+test writer_lock_is_recursive_and_thread_exclusive ... ok
+test readers_only_see_complete_records_during_publication ... ok
+test reopened_work_markdown_edits_advance_revision_and_repack_without_conflict ... ok
+test restored_work_twin_preserves_history_through_index_repair_and_reopen ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
+
