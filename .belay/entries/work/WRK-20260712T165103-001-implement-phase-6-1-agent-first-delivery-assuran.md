@@ -3,10 +3,10 @@ schema_version: 1
 id: WRK-20260712T165103-001-implement-phase-6-1-agent-first-delivery-assuran
 type: work
 title: Implement Phase 6.1 agent-first delivery assurance
-status: completed
+status: archived
 created_at: 2026-07-12T16:51:03+09:00
-updated_at: 2026-08-18T20:38:50+09:00
-revision: 1
+updated_at: 2026-10-01T06:15:48+09:00
+revision: 2
 tags: []
 links:
 - relation: implements

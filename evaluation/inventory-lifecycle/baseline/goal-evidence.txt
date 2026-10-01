@@ -1,0 +1,34 @@
+Active goals: 8
+
+               traceability   verified
+decision             2/8       25%   1/8       12%
+implementation       8/8      100%   4/8       50%
+test                 4/8       50%   2/8       25%
+monitoring           0/8        0%   0/8        0%
+
+Uncovered (verified):
+  GOAL-20260726T014020-001-enable-responsible-traceable-evolutionary-develo test: no test or CI evidence. Next: record fresh passing test or CI evidence
+  GOAL-20260726T014020-001-enable-responsible-traceable-evolutionary-develo monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260729T204514-001-streamline-agent-workflow-output decision: decision evidence missing, stale, or not passing. Next: link an accepted decision and record passing evidence
+  GOAL-20260729T204514-001-streamline-agent-workflow-output implementation: work evidence missing, stale, or not passing. Next: link work and record fresh test or CI evidence
+  GOAL-20260729T204514-001-streamline-agent-workflow-output test: test evidence stale or failing. Next: record fresh passing test or CI evidence
+  GOAL-20260729T204514-001-streamline-agent-workflow-output monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260817T093055-001-agent-consumable-plan-en decision: no fulfills decision entry. Next: link an accepted decision and record passing evidence
+  GOAL-20260817T093055-001-agent-consumable-plan-en implementation: work evidence missing, stale, or not passing. Next: link work and record fresh test or CI evidence
+  GOAL-20260817T093055-001-agent-consumable-plan-en test: no test or CI evidence. Next: record fresh passing test or CI evidence
+  GOAL-20260817T093055-001-agent-consumable-plan-en monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260817T185935-001-library-status-include-e decision: no fulfills decision entry. Next: link an accepted decision and record passing evidence
+  GOAL-20260817T185935-001-library-status-include-e implementation: work evidence missing, stale, or not passing. Next: link work and record fresh test or CI evidence
+  GOAL-20260817T185935-001-library-status-include-e test: test evidence stale or failing. Next: record fresh passing test or CI evidence
+  GOAL-20260817T185935-001-library-status-include-e monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260820T214155-001-retrieval-hygiene-archiv decision: no fulfills decision entry. Next: link an accepted decision and record passing evidence
+  GOAL-20260820T214155-001-retrieval-hygiene-archiv implementation: work evidence missing, stale, or not passing. Next: link work and record fresh test or CI evidence
+  GOAL-20260820T214155-001-retrieval-hygiene-archiv monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260901T091831-001-direct-evidence-retrieva decision: no fulfills decision entry. Next: link an accepted decision and record passing evidence
+  GOAL-20260901T091831-001-direct-evidence-retrieva monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260906T134724-001-context-cost-reduction decision: no fulfills decision entry. Next: link an accepted decision and record passing evidence
+  GOAL-20260906T134724-001-context-cost-reduction test: no test or CI evidence. Next: record fresh passing test or CI evidence
+  GOAL-20260906T134724-001-context-cost-reduction monitoring: no metric evidence. Next: record fresh metric evidence
+  GOAL-20260925T214740-001-belay-guidance-boundarie decision: no fulfills decision entry. Next: link an accepted decision and record passing evidence
+  GOAL-20260925T214740-001-belay-guidance-boundarie test: no test or CI evidence. Next: record fresh passing test or CI evidence
+  GOAL-20260925T214740-001-belay-guidance-boundarie monitoring: no metric evidence. Next: record fresh metric evidence

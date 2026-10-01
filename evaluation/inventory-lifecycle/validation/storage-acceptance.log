@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "evaluation": "evaluation-v1.md",
+  "binary_sha256": "1667342c8d2bb838d04dca0ad2db8e72847d590d2ab518d791341186c06b48a1",
+  "median_record_seconds": 0.012103437562473118,
+  "median_rebuild_seconds": 0.014472167007625103
+}

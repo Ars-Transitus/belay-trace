@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "operation_id": "status-072eb400c24b1194884e-archived",
+  "source": {
+    "id": "WRK-20260712T165103-001-implement-phase-6-1-agent-first-delivery-assuran",
+    "revision": 1,
+    "sha256": "072eb400c24b1194884e4da585596b7df79792fe46b3ae8cc4213f06617dc5b2"
+  },
+  "before": "completed",
+  "after": "archived",
+  "inbound_references": [],
+  "preview_hash": "f2ecc0ab7f45d54e07165134e7c4505cde1771467816e776ec4456132efaa57b"
+}

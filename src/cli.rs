@@ -53,6 +53,51 @@ Related Commands:
   Start with `belay init`. Use `belay <command> --help` for command-specific
   behavior, side effects, examples, and related commands."#;
 
+const INVENTORY_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  The default report is read-only. Heuristics propose review, never automatic
+  completion, merge or deletion. Preview binds source revisions and hashes;
+  apply changes only the selected preview, and restore produces a new preview.
+
+Examples:
+  belay inventory --format json --long-active-days 90
+  belay inventory preview WRK-... --status archived
+  belay inventory apply --file selected-preview.json
+  belay inventory restore --file receipt.json
+
+Exit Status:
+  0  Report, preview or selected operation succeeded
+  4  Invalid input
+  5  Stale preview or source conflict
+  6  Storage unavailable
+
+Related Commands:
+  context, show, verify status, lifecycle"#;
+
+const LIFECYCLE_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  Summaries are derived-only and never replace verification Evidence. Packing
+  retains exact original payloads and validates their hashes before retiring
+  unchanged loose files. Stop legacy CLI writers and manual edits before
+  migration or compaction. Recovery receipts and packs are not disposable cache.
+  New-format storage rejects old CLI readers/writers; never force a downgrade.
+
+Examples:
+  belay lifecycle summary sources WRK-... EVD-...
+  belay lifecycle summary store --file authored-summary.json
+  belay lifecycle pack preview
+  belay lifecycle pack apply --file selected-pack-preview.json
+  belay lifecycle pack recover <receipt-id>
+  belay lifecycle pack restore <pack-hash>
+  belay lifecycle cache
+
+Exit Status:
+  0  Selected operation succeeded
+  4  Invalid input, unsupported format or corrupt pack
+  5  Source revision or hash conflict
+  6  Filesystem or index failure
+
+Related Commands:
+  inventory, show, sync, rebuild, verify, coverage"#;
+
 const INIT_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Creates or completes .belay/config.toml, managed entry directories, local SQLite
   state, .belay/.gitignore, and deterministic agent integration templates. Managed
@@ -186,8 +231,8 @@ const SHOW_AFTER_HELP: &str = r#"Behavior and Side Effects:
   Displays one complete entry, its managed source path, and inbound and outbound links
   using display IDs. It does not change repository state.
 
-  Evidence IDs (`EVD-...`) are resolved from `.belay/evidence/*.ndjson` even when
-  SQLite has not indexed the record. Exact IDs and unique prefixes succeed;
+  Evidence IDs (`EVD-...`) resolve across legacy monthly files, individual records
+  and verified packs, even before SQLite indexing. Exact IDs and unique prefixes succeed;
   slugs and fragments are rejected. Show never writes Evidence or Entry state.
 
   Appending a canonical fragment displays only that item: the line defining it
@@ -332,11 +377,15 @@ Related Commands:
   `belay goal lint`, `belay show <id>#t-NNN`, and `belay coverage`."#;
 
 const VERIFY_AFTER_HELP: &str = r#"Behavior and Side Effects:
-  Records append-only Evidence in .belay/evidence/*.ndjson and indexes it in SQLite.
+  Publishes immutable Evidence in .belay/evidence/records/<ID>.json, then indexes
+  it in SQLite. Legacy monthly files and verified packs remain readable.
   Evidence is linked to Goal, Decision, Work, or Goal item references and is never
   edited in place; updates are represented by new records.
 
-  Retrieve a record with `belay show EVD-...` from NDJSON. Herdr and other runners
+  If publication succeeds but indexing fails, keep the reported ID and use sync
+  or rebuild; do not blindly resubmit as a new record.
+
+  Retrieve an original record with `belay show EVD-...`. Herdr and other runners
   keep their own provenance; `show EVD` is not a required settlement gate.
   Task settlement and Goal coverage remain separate judgments.
 
@@ -381,9 +430,10 @@ const SYNC_AFTER_HELP: &str = r#"Behavior and Side Effects:
   counterparts are restored, and conflicts preserve both sides. Batch sync is
   atomic per entry. Explicit --prefer resolution is entry-scoped.
 
-  After Entry reconciliation, valid `.belay/evidence/*.ndjson` mirrors are indexed
-  into SQLite in one transaction. Validation or duplicate failure keeps the
-  previous Evidence index.
+  After Entry reconciliation, valid Evidence from monthly files, individual
+  records and verified packs is indexed into SQLite in one transaction.
+  Identical placements deduplicate; validation or conflicting content keeps
+  the previous Evidence index.
 
 Examples:
   belay sync
@@ -526,6 +576,31 @@ Exit Status:
 Related Commands:
   `belay context compile`, `belay show`, `belay sync`, and `belay doctor`."#;
 
+const CONTRACT_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  Validate is read-only. Preview additionally verifies the configured Git remote,
+  exact HEAD and an adapter-supplied source freshness observation. The first Apply
+  upgrade to storage schema 3 requires --legacy-writers-quiesced, acknowledging
+  that already-running older writers and uncoordinated editors have been stopped;
+  the schema gate only makes subsequently opened schema-2-only writers reject the
+  repository. Apply then stores an immutable original, durable intent, Goal/Plan projections
+  and a filesystem receipt. Apply never fetches a source or claims live freshness.
+
+Examples:
+  belay contract validate --file contract.json
+  belay contract preview --file contract.json --source-freshness observed-current
+  belay contract apply --file contract.json --source-freshness observed-current --approve sha256:... --legacy-writers-quiesced
+  belay contract show OMNIA-DEMO-001 --revision 1
+
+Exit Status:
+  0  Contract operation completed
+  3  Repository is not initialized
+  4  Contract, lifecycle, freshness, target or invocation is invalid
+  5  Preview, identity, original, projection or receipt conflicts
+  6  Durable storage failed
+
+Related Commands:
+  `belay show`, `belay sync`, and `belay rebuild`."#;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "belay",
@@ -596,10 +671,22 @@ enum Command {
     Context(ContextArgs),
 
     #[command(
+        about = "Validate, preview, apply, and inspect Omnia Contracts",
+        after_help = CONTRACT_AFTER_HELP
+    )]
+    Contract(ContractArgs),
+
+    #[command(
         about = "List deterministic archive candidates",
         after_help = ARCHIVE_AFTER_HELP
     )]
     Archive(ArchiveArgs),
+
+    #[command(about = "Inspect source-backed inventory and preview reversible status changes", after_help = INVENTORY_AFTER_HELP)]
+    Inventory(InventoryArgs),
+
+    #[command(about = "Manage derived summaries and reversible original-data packs", after_help = LIFECYCLE_AFTER_HELP)]
+    Lifecycle(LifecycleArgs),
 
     #[command(
         about = "Prepare and safely materialize a Route decision run",
@@ -872,6 +959,118 @@ struct ArchiveArgs {
     command: ArchiveCommand,
 }
 
+#[derive(Debug, Args)]
+struct ContractArgs {
+    #[command(subcommand)]
+    command: ContractCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum ContractCommand {
+    #[command(about = "Strictly validate a canonical Contract JSON file")]
+    Validate(ContractFileArgs),
+    #[command(about = "Preview deterministic Goal and Plan projections")]
+    Preview(ContractObservedArgs),
+    #[command(about = "Apply an exact approved Contract preview")]
+    Apply(ContractApplyArgs),
+    #[command(about = "Show a durable completed Contract receipt")]
+    Show(ContractShowArgs),
+    #[command(about = "Produce a deterministic read-only Outcome Capsule")]
+    Capsule(ContractCapsuleArgs),
+}
+
+#[derive(Debug, Args)]
+struct ContractFileArgs {
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+}
+
+#[derive(Debug, Args)]
+struct ContractObservedArgs {
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+    #[arg(long, value_enum)]
+    source_freshness: ContractFreshness,
+}
+
+#[derive(Debug, Args)]
+struct ContractApplyArgs {
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+    #[arg(long, value_name = "SHA256")]
+    approve: String,
+    #[arg(long, value_enum)]
+    source_freshness: ContractFreshness,
+    /// Acknowledge that legacy writers and uncoordinated editors are stopped for the first schema 3 upgrade.
+    #[arg(long)]
+    legacy_writers_quiesced: bool,
+}
+
+#[derive(Debug, Args)]
+struct ContractShowArgs {
+    contract_id: String,
+    #[arg(long)]
+    revision: u32,
+}
+
+#[derive(Debug, Args)]
+struct ContractCapsuleArgs {
+    #[arg(long)]
+    contract_id: String,
+    #[arg(long)]
+    revision: u32,
+    #[arg(long)]
+    as_of: String,
+    #[arg(long, value_enum)]
+    execution: CapsuleExecution,
+    #[arg(long, value_enum, default_value = "json")]
+    format: CapsuleFormat,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CapsuleExecution {
+    NotStarted,
+    Running,
+    Paused,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CapsuleFormat {
+    Json,
+    Human,
+}
+
+impl From<CapsuleExecution> for crate::capsule::Execution {
+    fn from(value: CapsuleExecution) -> Self {
+        match value {
+            CapsuleExecution::NotStarted => Self::NotStarted,
+            CapsuleExecution::Running => Self::Running,
+            CapsuleExecution::Paused => Self::Paused,
+            CapsuleExecution::Completed => Self::Completed,
+            CapsuleExecution::Cancelled => Self::Cancelled,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ContractFreshness {
+    ObservedCurrent,
+    Changed,
+    Unknown,
+}
+
+impl From<ContractFreshness> for crate::contract::SourceFreshness {
+    fn from(value: ContractFreshness) -> Self {
+        match value {
+            ContractFreshness::ObservedCurrent => Self::ObservedCurrent,
+            ContractFreshness::Changed => Self::Changed,
+            ContractFreshness::Unknown => Self::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Subcommand)]
 enum ArchiveCommand {
     #[command(about = "List deterministic archive candidates without changing status")]
@@ -1009,6 +1208,113 @@ struct GoalImproveArgs {
 }
 
 #[derive(Debug, Args)]
+struct InventoryArgs {
+    #[arg(long, value_enum, default_value_t = CliReportFormat::Human)]
+    format: CliReportFormat,
+    #[arg(long, default_value_t = 90)]
+    long_active_days: u64,
+    /// Fixed RFC3339 observation time for reproducible reports.
+    #[arg(long)]
+    now: Option<String>,
+    #[command(subcommand)]
+    command: Option<InventoryCommand>,
+}
+
+#[derive(Debug, Subcommand)]
+enum InventoryCommand {
+    /// Prepare a source-bound status change without applying it.
+    Preview {
+        id: String,
+        #[arg(long)]
+        status: String,
+    },
+    /// Apply exactly the operations in a previously selected preview.
+    Apply {
+        #[arg(long)]
+        file: PathBuf,
+    },
+    /// Preview restoration from a status-change receipt.
+    Restore {
+        #[arg(long)]
+        file: PathBuf,
+    },
+}
+
+#[derive(Debug, Args)]
+struct LifecycleArgs {
+    #[command(subcommand)]
+    command: LifecycleCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum LifecycleCommand {
+    /// Store or inspect a derived, source-bound summary (never verification evidence).
+    Summary {
+        #[command(subcommand)]
+        command: SummaryCommand,
+    },
+    /// Preview, publish, recover, or restore a validated original-data pack.
+    Pack {
+        #[command(subcommand)]
+        command: PackCommand,
+    },
+    /// Inspect explicitly regenerable cache candidates.
+    Cache {
+        #[command(subcommand)]
+        command: Option<CacheCommand>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum CacheCommand {
+    /// Rebuild only a named cache candidate; source receipts are preserved.
+    Rebuild { path: String },
+}
+
+#[derive(Debug, Subcommand)]
+enum SummaryCommand {
+    Store {
+        #[arg(long)]
+        file: PathBuf,
+    },
+    Show {
+        id: String,
+    },
+    List,
+    /// Obtain exact source bindings before authoring a summary.
+    Sources {
+        ids: Vec<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum PackCommand {
+    /// Read the exact original payload at a canonical ID and revision.
+    Original {
+        id: String,
+        #[arg(long)]
+        revision: u32,
+    },
+    Preview {
+        /// Explicit source IDs; omitted selects eligible sources only.
+        #[arg(long = "id")]
+        ids: Vec<String>,
+    },
+    Apply {
+        #[arg(long)]
+        file: PathBuf,
+    },
+    Recover {
+        receipt: String,
+    },
+    Restore {
+        pack: String,
+        #[arg(long)]
+        id: Option<String>,
+    },
+}
+
+#[derive(Debug, Args)]
 struct VerifyArgs {
     #[command(subcommand)]
     command: VerifyCommand,
@@ -1132,6 +1438,54 @@ enum CliExportFormat {
     Markdown,
     Json,
     Ndjson,
+}
+
+fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, BelayError> {
+    let bytes = fs::read(path).map_err(|error| BelayError::io("read JSON input", path, error))?;
+    serde_json::from_slice(&bytes).map_err(|error| BelayError::Validation {
+        message: format!("invalid JSON in {}: {error}", path.display()),
+    })
+}
+
+fn print_json<T: serde::Serialize>(value: &T) -> Result<(), BelayError> {
+    let text = serde_json::to_string_pretty(value).map_err(|error| BelayError::Validation {
+        message: format!("could not encode JSON: {error}"),
+    })?;
+    println!("{text}");
+    Ok(())
+}
+
+fn run_pack_command(
+    repository: &repository::Repository,
+    command: PackCommand,
+) -> Result<(), BelayError> {
+    match command {
+        PackCommand::Original { id, revision } => {
+            print_json(&crate::pack::resolve_original(repository, &id, revision)?)
+        }
+        PackCommand::Preview { ids } => print_json(&crate::pack::preview(repository, &ids)?),
+        PackCommand::Apply { file } => {
+            print_json(&crate::pack::apply(repository, &read_json(&file)?)?)
+        }
+        PackCommand::Recover { receipt } => {
+            print_json(&crate::pack::recover(repository, &receipt)?)
+        }
+        PackCommand::Restore { pack, id } => {
+            print_json(&crate::pack::restore(repository, &pack, id.as_deref())?)
+        }
+    }
+}
+
+fn require_indexed(outcome: &evidence::RecordedEvidence) -> Result<(), BelayError> {
+    match &outcome.index_error {
+        Some(error) => Err(BelayError::StorageSummary {
+            message: format!(
+                "Evidence {} is saved but not indexed: {error}. Keep this ID; repair the index with `belay sync` or `belay rebuild`. Do not resubmit with a new ID.",
+                outcome.record.display_id,
+            ),
+        }),
+        None => Ok(()),
+    }
 }
 
 pub fn run() -> Result<(), BelayError> {
@@ -1355,6 +1709,148 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
             print!("{}", bundle.text);
             Ok(())
         }
+        Command::Contract(arguments) => {
+            match arguments.command {
+                ContractCommand::Validate(arguments) => {
+                    let contract = crate::contract::load_contract(&arguments.file)?;
+                    print_json(
+                        &serde_json::json!({"kind":"contract","valid":true,"contract_digest":contract.contract_digest}),
+                    )?;
+                }
+                ContractCommand::Preview(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    let contract = crate::contract::load_contract(&arguments.file)?;
+                    print_json(&crate::contract::preview(
+                        &repository,
+                        &contract,
+                        arguments.source_freshness.into(),
+                    )?)?;
+                }
+                ContractCommand::Apply(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    let contract = crate::contract::load_contract(&arguments.file)?;
+                    print_json(&crate::contract::apply(
+                        &repository,
+                        &contract,
+                        &arguments.approve,
+                        arguments.source_freshness.into(),
+                        arguments.legacy_writers_quiesced,
+                    )?)?;
+                }
+                ContractCommand::Show(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    print_json(&crate::contract::show(
+                        &repository,
+                        &arguments.contract_id,
+                        arguments.revision,
+                    )?)?;
+                }
+                ContractCommand::Capsule(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    let capsule = crate::capsule::produce(
+                        &repository,
+                        &arguments.contract_id,
+                        arguments.revision,
+                        &arguments.as_of,
+                        arguments.execution.into(),
+                    )?;
+                    match arguments.format {
+                        CapsuleFormat::Json => print_json(&capsule)?,
+                        CapsuleFormat::Human => {
+                            print!("{}", crate::capsule::render_uncovered(&capsule))
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        Command::Inventory(arguments) => {
+            let repository = repository::discover(current_dir)?;
+            match arguments.command {
+                None => {
+                    let now = arguments
+                        .now
+                        .map(|value| {
+                            chrono::DateTime::parse_from_rfc3339(&value)
+                                .map(|value| value.with_timezone(&chrono::Utc))
+                                .map_err(|error| BelayError::Validation {
+                                    message: error.to_string(),
+                                })
+                        })
+                        .transpose()?
+                        .unwrap_or_else(chrono::Utc::now);
+                    let report = crate::inventory::collect(
+                        &repository,
+                        crate::inventory::InventoryOptions {
+                            now,
+                            long_active_days: arguments.long_active_days,
+                        },
+                    )?;
+                    match arguments.format {
+                        CliReportFormat::Human => {
+                            print!("{}", crate::inventory::render_report(&report))
+                        }
+                        CliReportFormat::Json => print_json(&report)?,
+                    }
+                }
+                Some(InventoryCommand::Preview { id, status }) => {
+                    print_json(&crate::inventory::preview_status_change(
+                        &repository,
+                        &id,
+                        EntryStatus::from_str(&status)?,
+                    )?)?;
+                }
+                Some(InventoryCommand::Apply { file }) => {
+                    print_json(&crate::inventory::apply_status_preview(
+                        &repository,
+                        &read_json(&file)?,
+                    )?)?;
+                }
+                Some(InventoryCommand::Restore { file }) => {
+                    print_json(&crate::inventory::preview_restore(
+                        &repository,
+                        &read_json(&file)?,
+                    )?)?;
+                }
+            }
+            Ok(())
+        }
+        Command::Lifecycle(arguments) => {
+            let repository = repository::discover(current_dir)?;
+            match arguments.command {
+                LifecycleCommand::Summary { command } => match command {
+                    SummaryCommand::Store { file } => {
+                        let path = crate::summary::save(&repository, &read_json(&file)?)?;
+                        print_json(
+                            &serde_json::json!({"saved": path, "authority": "derived-only"}),
+                        )?;
+                    }
+                    SummaryCommand::Show { id } => {
+                        print_json(&crate::summary::get(&repository, &id)?)?
+                    }
+                    SummaryCommand::List => print_json(&crate::summary::list(&repository)?)?,
+                    SummaryCommand::Sources { ids } => {
+                        let bindings = ids
+                            .iter()
+                            .map(|id| crate::summary::source_binding(&repository, id))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        print_json(&bindings)?;
+                    }
+                },
+                LifecycleCommand::Cache { command } => match command {
+                    None => print_json(&crate::inventory::cache_preview(&repository))?,
+                    Some(CacheCommand::Rebuild { path }) => {
+                        let outcome = crate::inventory::regenerate_cache(&repository, &path)?;
+                        print_json(&serde_json::json!({
+                            "entries": outcome.entries, "evidence": outcome.evidence,
+                            "operation": "rebuild-index", "originals_deleted": false,
+                        }))?;
+                    }
+                },
+                LifecycleCommand::Pack { command } => run_pack_command(&repository, command)?,
+            }
+            Ok(())
+        }
         Command::Archive(arguments) => {
             let repository = repository::discover(current_dir)?;
             match arguments.command {
@@ -1569,12 +2065,14 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
                             verifies: arguments.verifies,
                         },
                     )?;
+                    require_indexed(&record)?;
                     println!("Recorded {}", record.display_id);
                     Ok(())
                 }
                 VerifyCommand::Import(arguments) => {
                     let record =
                         evidence::import_junit(&repository, &arguments.junit, arguments.verifies)?;
+                    require_indexed(&record)?;
                     println!("Imported {}", record.display_id);
                     Ok(())
                 }

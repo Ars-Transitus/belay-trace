@@ -1,0 +1,14 @@
+ID: EVD-20260926T004249-001
+Type: evidence
+Schema: 1
+Kind: llm-eval
+Verdict: fail
+Commit: 60138f1314bc93a2f50d7b73313de06eaac82016
+Captured: 2026-09-26T00:42:49+09:00
+Issuer: local:user
+Source: fresh reviewer /root/review_belay_complete; worker commit 20ed57e650bf0cf54631169ba2accb3dd29bbe05
+Summary: Bounded repair required: obsolete generated-skill test expects old Unknowns wording; doctor stale help omits missing required reference case. No other acceptance-relevant regression reported.
+Detail: {}
+Links:
+  - verifies WRK-20260925T214846-001-implement-belay-guidance
+Location: .belay/evidence/2026-09.ndjson:17

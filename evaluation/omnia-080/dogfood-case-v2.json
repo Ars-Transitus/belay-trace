@@ -1,0 +1,27 @@
+{
+  "case_id": "OB-EVAL-CODE-001",
+  "goal": "Add machine-readable exact failing field path to Contract helper validation diagnostics",
+  "base_commit": "f48e67339890f56af2bdb78b1bb4355f5aa250e3",
+  "working_input_hashes": {
+    "scripts/omnia_contract.py": "c65000811f4dec5e6de47133941fc505cc125c73e9d6ed9996471d5fbcd1edb4",
+    "tests/omnia_contract/test_contract.py": "64ad3f5db8bf07d43b87e8c26ec8010161d36210310597462970049120795818",
+    "evaluation/omnia-080/evaluation-v1.md": "7980c3ed3db425f21b2b50a46e2e2ce2bbf02a6486878a64ab85f65570899159"
+  },
+  "acceptance": [
+    "Existing error text and exit code remain compatible",
+    "Invalid source completeness reports exact source field in structured error_path",
+    "Unknown/missing field diagnostics expose a stable explicit path",
+    "Successful output remains unchanged"
+  ],
+  "baseline": "Current CLI returns error string and valid=false without structured error_path",
+  "human_time_baseline": "Unknown; no historical improvement claim",
+  "scope": [
+    "scripts/omnia_contract.py",
+    "tests/omnia_contract/test_contract.py",
+    "documentation"
+  ],
+  "state": "fixed executable case; implementation waits for OB10 review and skill",
+  "case_revision": 2,
+  "revision_reason": "Freeze current diagnostic baseline after integration validator changes; case/AC/ceilings unchanged.",
+  "contract_digest": "sha256:57f6467d37842bf6d42d5d7c10534c79d887693dd7362722118e5316d9ac6c17"
+}

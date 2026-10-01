@@ -10,6 +10,21 @@ SQLite is the operational store. Deterministic Markdown files under
 
 The v1 implementation requires Rust 1.87 or newer.
 
+To build and install locally (requires Make and Python 3):
+
+```sh
+make build                          # release build only
+make deploy                         # install to ~/.local/bin/belay
+make -j deploy BINDIR="/tmp/belay test/bin"
+```
+
+Deployment uses the executable reported by Cargo, including when
+`CARGO_TARGET_DIR` or Cargo configuration changes the output directory. It
+replaces the destination atomically after a successful build and copy; an
+existing destination symlink is replaced without modifying its referent.
+It does not initialize repositories or install agent skills. If needed, add
+`export PATH="$HOME/.local/bin:$PATH"` to your shell configuration yourself.
+
 ```sh
 cargo build --release --locked
 ./target/release/belay init
@@ -131,8 +146,8 @@ belay show DEC-20260607T090000-001-use-sqlite
 belay show EVD-20260723T120500-001
 ```
 
-`belay show` also retrieves Evidence from `.belay/evidence/*.ndjson` by exact `EVD-...`
-ID or unique prefix, even before SQLite has indexed the record. Evidence slugs
+`belay show` also retrieves Evidence across legacy monthly files, individual records
+and verified packs by exact `EVD-...` ID or unique prefix, even before SQLite indexing. Evidence slugs
 and fragments are rejected. Entry unique prefix and slug resolution is unchanged.
 
 Review Goal quality without calling an LLM:
@@ -201,6 +216,28 @@ slug.
 Context uses direct links and a deterministic token estimate. Embeddings are not
 required for the v1 workflow.
 
+## Inventory And Lifecycle
+
+`belay inventory --format json` reports source-bound findings without changing
+status. Use `inventory preview <ID> --status <STATUS>` to inspect one proposed
+change, and apply only the explicitly selected preview. Age and a completed
+status do not establish verification or authorize archiving.
+
+`belay lifecycle summary` stores and inspects authored, source-bound summaries;
+current summaries can provide optional context prose, while original Evidence
+remains the verification authority. `belay lifecycle pack` previews, applies,
+recovers and restores packs retaining exact original payloads. New Evidence
+uses one complete file per distributed ID, with the legacy monthly reader
+retained. Stop old writers before enabling schema 2; older CLIs refuse that
+schema. A saved but unindexed record must be recovered by reindexing its ID,
+not by issuing a duplicate record.
+
+See [inventory and lifecycle usage](docs/inventory-lifecycle-usage.md) for
+explicit previews, restoration and compatibility boundaries, and
+[the 0.7.0 release notes](docs/inventory-lifecycle-release-notes.md) for the
+current adoption status. Packing does not preserve external raw logs merely
+because an Evidence record contains their path.
+
 ## Local Trace Browser
 
 Launch a read-only provenance browser bound only to loopback:
@@ -240,9 +277,10 @@ belay verify import --junit target/junit.xml --verifies WRK-20260607T091000-001-
 belay verify status GOAL-20260607T085900-001-reliable-repository-sync
 ```
 
-Evidence is mirrored to `.belay/evidence/YYYY-MM.ndjson` and indexed in SQLite.
-`belay show EVD-...` reads the durable NDJSON record directly. `belay sync`
-indexes valid mirrors transactionally and keeps the previous Evidence index when
+New Evidence is published to `.belay/evidence/records/<ID>.json`, then indexed in
+SQLite. Existing monthly NDJSON and verified packs remain readable.
+`belay show EVD-...` reads the original record. `belay sync`
+indexes valid originals transactionally and keeps the previous Evidence index when
 validation fails. Herdr and other runners keep their own provenance; do not make
 `show EVD` a required settlement gate. Task settlement and Goal coverage remain
 separate judgments.

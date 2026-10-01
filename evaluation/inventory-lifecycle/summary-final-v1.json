@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "binary_sha256": "fdb35a289a2ea9c3a474762ec613b0c8fb8e72f2179ff4cd04bda9df781759d2",
+  "scope": "Scripted same-compiler same-original-data authored fixture; prose fidelity reviewed against six source sections, not string equivalence as quality certification.",
+  "before": {
+    "reads": 2,
+    "tokens": 526,
+    "outputs": [
+      "# Context: WRK-20260930T233724-001-authored-summary-fixture\n(compiled by belay, budget=5000)\nToken estimate: ASCII bytes/4 (rounded up) + non-ASCII scalars.\n\n## Selection\nRelated by query/link/seed; canonical IDs deduplicated. Summary context: retrieve focus for complete Task boundaries before execution. Unrelated scope excluded; archived excluded=0.\n\n## Required boundaries\n## Constraints\nProduction migration is excluded. The fixture does not authorize changes to a production system.\n\n\n\n## Work\nWRK-20260930T233724-001-authored-summary-fixture [completed]: authored-summary-fixture\nWhy: explicit seed\nArtifacts: External logs are references only and are not preserved automatically.\nEvidence: pass test fresh; status is not verification.\n\n\n## Sources\nRetrieve original: belay show <ID>\n- EVD-566ddd626db6f06b72f2361034c2082a\n- WRK-20260930T233724-001-authored-summary-fixture\n",
+      "ID: WRK-20260930T233724-001-authored-summary-fixture\nType: work\nTitle: authored-summary-fixture\nStatus: completed\nCreated: 2026-09-30T23:37:24+09:00\nUpdated: 2026-09-30T23:37:24+09:00\nRevision: 2\nSource: entries/work/WRK-20260930T233724-001-authored-summary-fixture.md\nTags: none\nMetadata: {}\nOutbound Links:\n  none\nInbound Links:\n  none\nBody:\n## Outcome\nThe isolated staging fixture accepts valid UTF-8 CSV amounts and rejects malformed amounts. Only the fixture was evaluated; a completed Work status does not verify a Goal.\n\n## Local rationale\nStrict amount parsing was chosen within this fixture because silently truncating invalid amounts would obscure input errors. This rationale is not a production adoption decision.\n\n## Constraints\nProduction migration is excluded. The fixture does not authorize changes to a production system.\n\n## Unresolved\nLegacy Shift-JIS inputs remain untested. No claim about every encoding or importer is supported.\n\n## Lesson\nHypothesis: explicit rejection might reduce silent corruption elsewhere. No general result is established.\n\n## Artifacts\nstaging-import.rs is an illustrative fixture artifact reference. External logs are references only and are not preserved automatically.\n"
+    ]
+  },
+  "after": {
+    "reads": 1,
+    "tokens": 384,
+    "outputs": [
+      "# Context: WRK-20260930T233724-001-authored-summary-fixture\n(compiled by belay, budget=5000)\nToken estimate: ASCII bytes/4 (rounded up) + non-ASCII scalars.\n\n## Selection\nRelated by query/link/seed; canonical IDs deduplicated. Summary context: retrieve focus for complete Task boundaries before execution. Unrelated scope excluded; archived excluded=0.\n\n## Required boundaries\n## Constraints\nProduction migration is excluded. The fixture does not authorize changes to a production system.\n\n\n\n## Work\nWRK-20260930T233724-001-authored-summary-fixture [completed]: authored-summary-fixture\nWhy: explicit seed\nDerived summary navigation-fixture revision 1 (authored prose, not verification; original Evidence below):\nOutcome: Valid UTF-8 staging fixture amounts accepted; malformed amounts rejected. No Goal verification.\nRationale and scope: Strict parsing avoids silently truncated amounts within this fixture; not production adoption.\nConstraints: Production migration is excluded.\nUnresolved: Legacy Shift-JIS inputs remain untested.\nHypothesis: Explicit rejection might reduce silent corruption elsewhere; no general result established.\nArtifacts: staging-import.rs is illustrative. External logs remain references only.\nLimitation: Bounded authored fixture; no measured model generalization.\nExpand originals with belay show <source ID>.\nEvidence: pass test fresh; status is not verification.\n\n\n## Sources\nRetrieve original: belay show <ID>\n- EVD-566ddd626db6f06b72f2361034c2082a\n- WRK-20260930T233724-001-authored-summary-fixture\n"
+    ]
+  },
+  "artifact": {
+    "schema_version": 1,
+    "artifact_id": "navigation-fixture",
+    "artifact_revision": 1,
+    "generator_version": "authored-semantic-fixture-v1",
+    "kind": "derived-summary",
+    "authority": "derived-only",
+    "sources": [
+      {
+        "id": "WRK-20260930T233724-001-authored-summary-fixture",
+        "revision": 2,
+        "sha256": "ebd8d2ce05c6a2d39b401ea392bee8c69d4a6c77c2ea9aaff9670af3a52cd7d4"
+      },
+      {
+        "id": "EVD-566ddd626db6f06b72f2361034c2082a",
+        "revision": 1,
+        "sha256": "e126bc6b56bc6481ff123db7c006dae17853b88fd808b1df53108a3f147926c0"
+      }
+    ],
+    "sections": [
+      {
+        "heading": "Outcome",
+        "text": "Valid UTF-8 staging fixture amounts accepted; malformed amounts rejected. No Goal verification.",
+        "source_ids": [
+          "WRK-20260930T233724-001-authored-summary-fixture",
+          "EVD-566ddd626db6f06b72f2361034c2082a"
+        ]
+      },
+      {
+        "heading": "Rationale and scope",
+        "text": "Strict parsing avoids silently truncated amounts within this fixture; not production adoption.",
+        "source_ids": [
+          "WRK-20260930T233724-001-authored-summary-fixture"
+        ]
+      },
+      {
+        "heading": "Constraints",
+        "text": "Production migration is excluded.",
+        "source_ids": [
+          "WRK-20260930T233724-001-authored-summary-fixture"
+        ]
+      },
+      {
+        "heading": "Unresolved",
+        "text": "Legacy Shift-JIS inputs remain untested.",
+        "source_ids": [
+          "WRK-20260930T233724-001-authored-summary-fixture"
+        ]
+      },
+      {
+        "heading": "Hypothesis",
+        "text": "Explicit rejection might reduce silent corruption elsewhere; no general result established.",
+        "source_ids": [
+          "WRK-20260930T233724-001-authored-summary-fixture"
+        ]
+      },
+      {
+        "heading": "Artifacts",
+        "text": "staging-import.rs is illustrative. External logs remain references only.",
+        "source_ids": [
+          "WRK-20260930T233724-001-authored-summary-fixture"
+        ]
+      }
+    ],
+    "limitations": [
+      "Bounded authored fixture; no measured model generalization."
+    ]
+  },
+  "source_body": "## Outcome\nThe isolated staging fixture accepts valid UTF-8 CSV amounts and rejects malformed amounts. Only the fixture was evaluated; a completed Work status does not verify a Goal.\n\n## Local rationale\nStrict amount parsing was chosen within this fixture because silently truncating invalid amounts would obscure input errors. This rationale is not a production adoption decision.\n\n## Constraints\nProduction migration is excluded. The fixture does not authorize changes to a production system.\n\n## Unresolved\nLegacy Shift-JIS inputs remain untested. No claim about every encoding or importer is supported.\n\n## Lesson\nHypothesis: explicit rejection might reduce silent corruption elsewhere. No general result is established.\n\n## Artifacts\nstaging-import.rs is an illustrative fixture artifact reference. External logs are references only and are not preserved automatically.\n"
+}

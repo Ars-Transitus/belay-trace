@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "evaluation": "evaluation-v1.md",
+  "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "binary_sha256": "1667342c8d2bb838d04dca0ad2db8e72847d590d2ab518d791341186c06b48a1",
+  "context": {
+    "token_reduction": 0.3457889188239428,
+    "runtime_ratio": 1.0412010032852124,
+    "search_count_ok": true,
+    "required_information_ok": true,
+    "limitation": "Scripted retrieval only; semantic/adversarial quality checks are separate gates."
+  },
+  "storage": {
+    "median_record_seconds": {
+      "frozen_old": 0.006993791495915502,
+      "final_new": 0.012103437562473118,
+      "current_old_control": 0.00817920797271654,
+      "ratio_to_frozen": 1.730597426237505,
+      "ratio_to_control": 1.4797811234103189
+    },
+    "median_rebuild_seconds": {
+      "frozen_old": 0.008813499938696623,
+      "final_new": 0.014472167007625103,
+      "current_old_control": 0.010501291020773351,
+      "ratio_to_frozen": 1.6420453972074693,
+      "ratio_to_control": 1.3781321724154372
+    },
+    "v1_runtime_pass": false,
+    "boundary": "Explicit numerical user approval covered context; extending +10% to storage was the root conservative v1 interpretation. No criterion revision has been authorized.",
+    "cost_observation": "Old append_mirror has no explicit fsync; new completed-file publication fsyncs file and directory. Code-level contract difference, not a measured attribution of runtime cost."
+  },
+  "input_reports": [
+    "context-acceptance-v1.json",
+    "storage-acceptance-v1.json",
+    "storage-control-final-v1.json",
+    "storage-baseline-v1.json"
+  ]
+}

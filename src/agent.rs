@@ -63,7 +63,7 @@ belay search --include-archived                               # include archived
 belay show <id>                                               # unique prefix or slug; full entry
 belay show <plan-id>#t-001                                    # one task; prefer over the whole Plan
 belay show <goal-id>#sc-001                                   # one Success Criterion
-belay show EVD-<id>                                           # exact Evidence ID or unique prefix; NDJSON
+belay show EVD-<id>                                           # exact Evidence ID or unique prefix; original
 belay archive candidates                                      # deterministic stale-history candidates
 belay add <goal|plan|decision|work|review|note> --title "<short-en-slug>"
 belay work create --task <plan-id>#t-001 --title "..." --body "..."
@@ -115,7 +115,8 @@ into typed Assessment and Proposal artifacts. Before a Route run, read
   those too before acting, and read the whole entry when work spans tasks.
 - Display IDs may be a unique prefix or slug. Ambiguous matches fail; never
   guess. Canonical IDs are what `show` prints. Evidence uses exact `EVD-...`
-  or a unique prefix from `.belay/evidence/*.ndjson`; slugs and fragments are
+  or a unique prefix across legacy monthly files, immutable records and verified
+  packs; slugs and fragments are
   rejected, and SQLite need not have indexed the record yet. `belay sync`
   indexes valid Evidence mirrors transactionally and keeps the previous index
   if validation fails. `belay rebuild` reports managed Markdown and Evidence
@@ -126,6 +127,41 @@ into typed Assessment and Proposal artifacts. Before a Route run, read
   then `belay status <id> archived` after judging. Do not archive a Goal or
   Plan without human confirmation. `belay doctor` stale is skill/AGENTS drift,
   not entry archive.
+
+## Inventory and source-backed summaries
+
+Start with `belay context` to identify current work, blockers and references.
+Use `context compile --focus <plan>#t-nnn` before execution; a live summary is
+not an execution packet or authorization. If required boundaries exceed the
+budget, increase the budget or retrieve the named sources; do not execute a
+partial packet. Use `show` or targeted `search` only for information still missing.
+Check Evidence separately: completed Tasks and derived summaries do not verify
+a Goal, and historical Decision acceptance does not establish current scope.
+
+Use `belay inventory --format json` for mechanical findings. Age and normalized
+text matches are candidates, not proof of obsolescence or semantic duplication.
+Review candidate originals and only their necessary dependencies. A semantic
+proposal names source IDs, exact revisions/hashes, rationale, uncertainty,
+proposed operation, reference impact and restoration method. Present concrete
+status/archive previews for human selection; never infer approval from a
+heuristic, merge records automatically, or change an Evidence verdict.
+
+For a completed work summary, write a derived artifact with generator version,
+source IDs/revisions/hashes and citations per section. Preserve outcomes,
+Decision rationale and scope, important constraints, unresolved issues,
+artifacts/Evidence and lessons. Label lessons as observations or hypotheses;
+do not generalize beyond their sources or add unsupported completion claims.
+Check every material statement against originals. A stale or missing binding
+requires original-source fallback; the summary never replaces Evidence or
+Coverage. Judge semantic fidelity, not identical generated prose.
+
+Packing retains exact originals and reduces loose file count; it does not
+promise lower total bytes or smaller Git history. Preview the exact sources,
+verify the pack and restoration on an isolated copy, then apply only the
+selected operation. Keep pack manifests and recovery receipts as source
+preservation metadata, never disposable cache. Old CLI writers must be stopped
+before upgrading the storage format; a saved-but-unindexed record must be
+reconciled by its existing ID instead of resubmitted with a new ID.
 
 ## Entry body templates
 

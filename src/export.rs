@@ -63,6 +63,7 @@ pub fn write(
     filter: &ExportFilter,
 ) -> Result<usize, BelayError> {
     validate_filter(filter)?;
+    crate::evidence::validate_index_sources(repository)?;
     let output = absolute_path(&repository.root, output);
     let entries = load_entries(repository, filter)?;
     let rendered = match format {
@@ -134,6 +135,7 @@ fn load_entries(
         .into_iter()
         .map(|(internal_id, source_path)| {
             let entry = store::load_entry(&transaction, &database_path, internal_id)?;
+            crate::contract::validate_entry_projection(repository, &entry)?;
             Ok(export_entry(entry, source_path.unwrap_or_default()))
         })
         .collect::<Result<Vec<_>, _>>()?;

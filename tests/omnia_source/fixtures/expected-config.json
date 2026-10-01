@@ -1,0 +1,6 @@
+{
+  "area_id": "AREA-SYNTHETIC",
+  "data_source_id": "DS-SYNTHETIC",
+  "repository": "github.com/Ars-Transitus/belay-trace",
+  "connector": "notion-mcp"
+}

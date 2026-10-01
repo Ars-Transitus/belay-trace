@@ -1,6 +1,6 @@
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 #[cfg(unix)]
 use std::ffi::OsString;
 use std::fs;
@@ -72,6 +72,8 @@ struct RouteReceipt<'a> {
 #[cfg(test)]
 thread_local! {
     static FAIL_DIRECTORY_SYNC: Cell<bool> = const { Cell::new(false) };
+    static FAIL_PARTIAL_WRITE: Cell<bool> = const { Cell::new(false) };
+    static FAIL_PREPUBLICATION: Cell<bool> = const { Cell::new(false) };
 }
 
 pub fn create(
@@ -95,6 +97,7 @@ pub fn create_work_for_task(
     title: String,
     body: String,
 ) -> Result<Entry, BelayError> {
+    let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     if title.trim().is_empty() {
         return validation("entry title must not be empty");
     }
@@ -193,6 +196,7 @@ fn create_with_metadata_internal(
     metadata: BTreeMap<String, MetadataValue>,
     receipt: Option<RouteReceipt<'_>>,
 ) -> Result<RouteMutationOutcome<Entry>, BelayError> {
+    let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     if title.trim().is_empty() {
         return validation("entry title must not be empty");
     }
@@ -384,7 +388,7 @@ fn derive_work_goal(
     let plan_goals = plan_goal_links(connection, database_path, &plan)?;
     if plan_goals.is_empty() {
         return validation(format!(
-            "Plan {} has no fulfills link to a Goal",
+            "Plan {} has no fulfills or implements link to a Goal",
             plan.display_id
         ));
     }
@@ -403,7 +407,7 @@ fn derive_work_goal(
                 && (link.fragment.is_none() || link.fragment == goal.fragment)
         }) {
             return validation(format!(
-                "Plan {} task #{} Goal item {} is not covered by a Plan fulfills link",
+                "Plan {} task #{} Goal item {} is not covered by a Plan Goal link",
                 plan.display_id, task_fragment, goal_item
             ));
         }
@@ -436,7 +440,7 @@ fn derive_work_goal(
             [link] => *link,
             [] => {
                 return validation(format!(
-                    "Plan {} task #{} Goal item {} is ambiguous or not covered by a Plan fulfills link",
+                    "Plan {} task #{} Goal item {} is ambiguous or not covered by a Plan Goal link",
                     plan.display_id, task_fragment, goal_item
                 ));
             }
@@ -465,8 +469,12 @@ fn plan_goal_links(
     plan: &Entry,
 ) -> Result<Vec<EntryReferenceParts>, BelayError> {
     let mut goals = Vec::new();
+    let mut canonical = BTreeSet::new();
     for link in &plan.links {
-        if link.relation != LinkRelation::Fulfills {
+        if !matches!(
+            link.relation,
+            LinkRelation::Fulfills | LinkRelation::Implements
+        ) {
             continue;
         }
         let reference = parse_entry_reference_id(&link.id)?;
@@ -476,7 +484,9 @@ fn plan_goal_links(
             continue;
         }
         validate_reference_fragment(connection, database_path, &reference)?;
-        goals.push(reference);
+        if canonical.insert(reference.canonical_id()) {
+            goals.push(reference);
+        }
     }
     Ok(goals)
 }
@@ -616,6 +626,7 @@ fn link_with_expected_revision_and_receipt(
     expected_revision: Option<u32>,
     receipt: Option<RouteReceipt<'_>>,
 ) -> Result<RouteMutationOutcome<String>, BelayError> {
+    let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     let database_path = repository.database_path();
     let mut connection = database::open(&database_path)?;
     let from_display_id = resolve_display_id_on(&connection, &database_path, from)?;
@@ -787,6 +798,7 @@ fn set_status_with_expected_revision_and_receipt(
     expected_revision: Option<u32>,
     receipt: Option<RouteReceipt<'_>>,
 ) -> Result<RouteMutationOutcome<String>, BelayError> {
+    let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     let database_path = repository.database_path();
     let mut connection = database::open(&database_path)?;
     let display_id = resolve_display_id_on(&connection, &database_path, display_id)?;
@@ -1163,6 +1175,15 @@ fn ensure_no_mirror_drift(
             message: format!(
                 "entry {display_id} mirror contains display ID {}; run `belay sync` before mutating it",
                 mirror.display_id
+            ),
+        });
+    }
+    let indexed_revision = entry_revision(connection, database_path, internal_id)?;
+    if mirror.revision != indexed_revision {
+        return Err(BelayError::Conflict {
+            message: format!(
+                "entry {display_id} original/index revision drift ({} versus {indexed_revision}); run belay sync before mutating",
+                mirror.revision
             ),
         });
     }
@@ -1833,6 +1854,14 @@ pub(crate) fn write_new_file(
     {
         let parent = open_managed_parent(repository, path)?;
         let temporary = write_temporary_at(&parent, path, contents)?;
+        #[cfg(test)]
+        if FAIL_PREPUBLICATION.replace(false) {
+            return Err(BelayError::io(
+                "publish completed temporary original",
+                path,
+                std::io::Error::other("injected interruption before publication"),
+            ));
+        }
         match rustix::fs::linkat(
             &parent.fd,
             &temporary,
@@ -1893,6 +1922,13 @@ pub(crate) fn replace_file(
     contents: &[u8],
     expected_hash: &str,
 ) -> Result<(), BelayError> {
+    if !path
+        .try_exists()
+        .map_err(|e| BelayError::io("inspect original", path, e))?
+    {
+        let raw = crate::lifecycle::read_original(repository, path)?;
+        write_new_file(repository, path, &raw)?;
+    }
     #[cfg(unix)]
     {
         let parent = open_managed_parent(repository, path)?;
@@ -2138,7 +2174,7 @@ fn validate_regular_file_at(parent: &ManagedParent, path: &Path) -> Result<(), B
 }
 
 #[cfg(unix)]
-pub(crate) fn read_managed_file(
+pub(crate) fn read_loose_managed_file(
     repository: &Repository,
     path: &Path,
 ) -> Result<String, BelayError> {
@@ -2167,7 +2203,7 @@ pub(crate) fn read_managed_file(
 }
 
 #[cfg(not(unix))]
-pub(crate) fn read_managed_file(
+pub(crate) fn read_loose_managed_file(
     repository: &Repository,
     path: &Path,
 ) -> Result<String, BelayError> {
@@ -2207,6 +2243,16 @@ fn write_temporary_at(
         ) {
             Ok(fd) => {
                 let mut file = fs::File::from(fd);
+                #[cfg(test)]
+                if FAIL_PARTIAL_WRITE.replace(false) {
+                    file.write_all(&contents[..contents.len() / 2])
+                        .map_err(|e| BelayError::io("write partial fixture", destination, e))?;
+                    return Err(BelayError::io(
+                        "finish original",
+                        destination,
+                        std::io::Error::other("injected interruption during completion"),
+                    ));
+                }
                 file.write_all(contents).map_err(|source| {
                     BelayError::io("write temporary file", destination, source)
                 })?;
@@ -2426,6 +2472,39 @@ mod tests {
     use crate::repository;
 
     #[test]
+    fn incomplete_and_completed_unpublished_evidence_remain_invisible() {
+        let dir = tempdir().unwrap();
+        let repo = repository::initialize(dir.path()).unwrap().repository;
+        let path = repo
+            .evidence_path()
+            .join("records/EVD-0123456789abcdef0123456789abcdef.json");
+        let raw = r#"{"schema_version":1,"display_id":"EVD-0123456789abcdef0123456789abcdef","kind":"test","verdict":"pass","commit_sha":"abc","captured_at":"2026-09-01T12:00:00Z","source":"fixture","issuer":"test","summary":"complete","detail":{},"links":[]}"#;
+        FAIL_PARTIAL_WRITE.set(true);
+        assert!(write_new_file(&repo, &path, raw.as_bytes()).is_err());
+        assert!(!path.exists());
+        assert!(
+            crate::evidence::read_located_mirrors(&repo)
+                .unwrap()
+                .is_empty()
+        );
+        FAIL_PREPUBLICATION.set(true);
+        assert!(write_new_file(&repo, &path, raw.as_bytes()).is_err());
+        assert!(!path.exists());
+        assert!(
+            crate::evidence::read_located_mirrors(&repo)
+                .unwrap()
+                .is_empty()
+        );
+        FAIL_DIRECTORY_SYNC.set(true);
+        assert!(write_new_file(&repo, &path, raw.as_bytes()).is_err());
+        assert_eq!(
+            crate::evidence::read_located_mirrors(&repo).unwrap().len(),
+            1
+        );
+        assert_eq!(fs::read_to_string(path).unwrap(), raw);
+    }
+
+    #[test]
     fn directory_sync_failure_leaves_markdown_for_recovery_and_rolls_back_sqlite() {
         let temporary = tempdir().expect("create temp directory");
         fs::create_dir(temporary.path().join(".git")).expect("create repository marker");
@@ -2618,4 +2697,93 @@ mod tests {
         assert_eq!(entry_count, 1);
         assert_eq!(receipt_count, 1);
     }
+}
+
+pub(crate) fn read_managed_file(
+    repository: &Repository,
+    path: &Path,
+) -> Result<String, BelayError> {
+    String::from_utf8(crate::lifecycle::read_original(repository, path)?).map_err(|e| {
+        BelayError::Validation {
+            message: format!("original is not UTF8: {e}"),
+        }
+    })
+}
+
+/// Reuse a validated directory descriptor when enumerating immutable originals.
+#[cfg(unix)]
+pub(crate) fn read_directory_files(
+    repository: &Repository,
+    directory: &Path,
+    extension: &str,
+) -> Result<Vec<(PathBuf, String)>, BelayError> {
+    let anchor = directory.join(".directory-anchor");
+    let parent = match open_managed_parent(repository, &anchor) {
+        Err(BelayError::Io { source, .. }) if source.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(vec![]);
+        }
+        other => other?,
+    };
+    let mut result = vec![];
+    for item in fs::read_dir(directory)
+        .map_err(|e| BelayError::io("list immutable originals", directory, e))?
+    {
+        let item = item.map_err(|e| BelayError::io("list immutable originals", directory, e))?;
+        let path = item.path();
+        if path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .starts_with('.')
+        {
+            continue;
+        }
+        let metadata = match fs::symlink_metadata(&path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            other => other.map_err(|e| BelayError::io("inspect immutable original", &path, e))?,
+        };
+        if metadata.file_type().is_symlink() {
+            return validation(format!("{} must not be a symlink", path.display()));
+        }
+        if path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .starts_with('.')
+            || path.extension().and_then(|s| s.to_str()) != Some(extension)
+        {
+            continue;
+        }
+        let fd = match rustix::fs::openat(
+            &parent.fd,
+            item.file_name(),
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
+            Err(e) if e == rustix::io::Errno::NOENT => continue,
+            other => other.map_err(|e| unix_io("open immutable original", &path, e))?,
+        };
+        let mut file = fs::File::from(fd);
+        if !file
+            .metadata()
+            .map_err(|e| BelayError::io("inspect immutable original", &path, e))?
+            .is_file()
+        {
+            return validation(format!("{} must be a regular file", path.display()));
+        }
+        let mut raw = String::new();
+        file.read_to_string(&mut raw)
+            .map_err(|e| BelayError::io("read immutable original", &path, e))?;
+        result.push((path, raw));
+    }
+    result.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(result)
+}
+#[cfg(not(unix))]
+pub(crate) fn read_directory_files(
+    _repository: &Repository,
+    _directory: &Path,
+    _extension: &str,
+) -> Result<Vec<(PathBuf, String)>, BelayError> {
+    validation("immutable lifecycle reader unsupported on this platform")
 }

@@ -1,0 +1,43 @@
+# Task packet: PLN-20260906T134828-001-context-cost-first-phase#t-001
+(compiled by belay, budget=2500)
+
+## Intent Brief
+### Constraints
+- Tier 3。2026-09-06の人間による本Plan指定の実装依頼を承認根拠とする。
+- coreは決定的。schema、canonical ID、show契約、FTS rankingを維持する。
+- 各Taskは専用worktreeで1 Work、独立review、最大1回のfresh fixer。rootが状態と統合を担当。
+- T-001/T-004: implement_medium (gpt-5.6-terra, medium), review_medium (gpt-5.6-sol, low)。
+- T-002/T-003: implement_high (gpt-5.6-sol, low), review_high (gpt-5.6-sol, medium)。dispatch時にroutingを再確認。
+
+### Non-goals
+- Skill分割、表示オプション追加、検索関連性変更、archive、installed設定更新、push/deploy。
+
+### Assumptions
+- 第1段階をcompilerに限定。Skill分割等は比較結果を見て別Planで扱う。
+- 重複fixtureの推定tokens減少を要求するが、未計測の削減率を約束しない。
+
+## Task
+Definition:
+| T-001 | SC-001 | 固定fixtureとbaseline計測 | implement_medium | verified | EVD-20260906T200824-001; EVD-20260906T200824-002; EVD-20260906T201311-001; REV-20260906T201200-001-context-baseline-review |
+
+Section:
+- Objective: 改善前の出力と情報充足度を再現可能に測る。
+- Scope: evaluation/context-cost/ のfixture、測定script、README、baseline report。runtime変更なし。
+- Steps: 重複Goal、working set、多Task Plan、Unknowns、長い制約、Evidence多数、日英混在、低budgetを含むfixtureを作る。変更前revisionとbinaryを特定し固定する。出力bytes、src/markdown.rsと同じ推定tokens、必須項目の在否、事前定義した取得手順の追加コマンド回数を保存する。
+- Acceptance: 各fixtureの入力、期待必須情報、budget、取得手順、baseline revisionが明示され、再実行で同じ結果になる。実モデルtokenや料金と混同しない。
+- Verification: fixture再実行と結果一致、独立review。将来比較用baselineを固定する。
+- Prior failure: Herdr runnerがagent status待ちでtimeout。保存lane w5:p5、worktree /private/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/erwin-routed/17f2e2fc15626fd2-0604552903a9。WRK-20260906T135430-001はsettlement metadataなしでabandoned。
+- Recovery: 2026-09-06、人間が旧pane終了、旧Work abandoned、clean baseからのfresh reimplementationを承認。
+- Recovery result: fresh workerはGit stage承認UIで停止し、親runnerがstatus timeout。pane w5:p6とworktree /private/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/erwin-routed/17f2e2fc15626fd2-f7e83d36c9a3を検査用に保持。implementer round budget 2/2を消費し、settlement metadataとcommitは未生成。
+- Alternate recovery: 2026-09-06、人間の回収指示により保存worktreeを再検査し、runner timeout後に残っていたcommitted成果を発見。fresh implementerが既存の単一Workを引き継いでportable runner、再現確認、Evidenceを完了し、commit cecedba7fec94f4d4e357ff46e9f1850538dd80aを作成した。fresh read-only reviewはfindingなしでPASS。
+
+## Goal item
+SC-001
+Resolved: GOAL-20260906T134724-001-context-cost-reduction
+Definition:
+- [SC-001] 固定fixtureと計測手順があり、変更前revision、出力bytes、推定tokens、必須情報、追加取得回数を再現可能に比較できる。
+
+## Evidence
+- EVD-20260906T201311-001 pass test evaluation/context-cost/run-baseline.sh /Users/ars/dev/repo/github.com/Ars-Transitus/belay-trace/target/debug/belay; cargo test --all-targets --locked; independent review REV-20260906T201200-001-context-baseline-review fresh
+- EVD-20260906T200824-002 pass test cargo test --all-targets --locked fresh
+- EVD-20260906T200824-001 pass test evaluation/context-cost/run-baseline.sh /private/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/erwin-routed/17f2e2fc15626fd2-f7e83d36c9a3/target/debug/belay (twice) fresh

@@ -22,3 +22,7 @@ yarn-error.log*
 /node_modules/
 /playwright-report/
 /test-results/
+
+# Omnia source originals and local recovery copies
+/.belay/local-sources/
+/.belay/local-backups/

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "status": "confirmed",
+  "contract_id": "OMNIA-DEMO-001",
+  "revision": 1,
+  "issued_at": "2026-10-01T00:00:00Z",
+  "expires_at": "2026-10-08T00:00:00Z",
+  "compiler_version": "omnia-contract-compiler/1",
+  "outcome": "Compile a deterministic read-only synthetic contract",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "text": "Compilation is deterministic",
+      "source_refs": [
+        "SRC-001"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-001",
+      "text": "Repeated compilation yields identical UTF-8 bytes",
+      "source_refs": [
+        "SRC-001"
+      ]
+    }
+  ],
+  "constraints": [
+    "Read local synthetic snapshots only",
+    "Use the fixed issuance timestamp"
+  ],
+  "non_goals": [
+    "Apply projections",
+    "Fetch external sources"
+  ],
+  "unknowns": [],
+  "delegation": {
+    "actor": "synthetic-compiler",
+    "scope": "OB-02/03 fixture",
+    "allowed_operations": [
+      "validate",
+      "compile",
+      "preview"
+    ]
+  },
+  "verification": [
+    "Run focused Python unittest",
+    "Compare canonical golden bytes"
+  ],
+  "stop_conditions": [
+    "Stop if a source is incomplete",
+    "Stop before any external mutation"
+  ],
+  "target": {
+    "repository": "github.com/Ars-Transitus/belay-trace",
+    "base_commit": "457136c4c1861742d195c8e881823630ad7ebd00"
+  },
+  "source_bundle": {
+    "bundle_id": "SYNTHETIC-BUNDLE-001",
+    "bundle_digest": "sha256:23d37bea435683fabd0a9a54db44a678963deb8859e029724975182a782199e4",
+    "sources": [
+      {
+        "id": "SRC-001",
+        "url": "synthetic://omnia/confirmed-input",
+        "retrieved_at": "2026-10-01T00:00:00Z",
+        "raw_snapshot_ref": "local-untracked://synthetic/source-001.json",
+        "raw_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "normalized_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "complete": true,
+        "edited_at": "2026-09-30T23:00:00Z"
+      }
+    ]
+  },
+  "input_id": "INPUT-DEMO-001",
+  "input_revision": 1,
+  "confirmation_ref": "synthetic://human-confirmation/001",
+  "assumptions": [
+    "All source references are synthetic"
+  ],
+  "context_refs": [
+    "SRC-001"
+  ]
+}

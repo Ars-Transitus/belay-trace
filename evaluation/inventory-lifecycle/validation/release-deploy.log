@@ -1,0 +1,4 @@
+python3 scripts/build-local.py --bindir "/var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T//belay-070-release-bin"
+   Compiling belay-trace v0.7.0 (/Users/ars/dev/repo/github.com/Ars-Transitus/belay-trace)
+    Finished `release` profile [optimized] target(s) in 10.48s
+Installed /var/folders/lp/cf8008053v12_7knfvy17jy40000gn/T/belay-070-release-bin/belay

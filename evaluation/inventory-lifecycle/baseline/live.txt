@@ -1,0 +1,71 @@
+# Working set
+(compiled by belay, budget=2500)
+
+## Next
+- PLN-20260906T134828-001-context-cost-first-phase#t-002 [not-started] compile重複排除と配分 — belay show PLN-20260906T134828-001-context-cost-first-phase#t-002
+- PLN-20260826T213447-001-atomic-work-creation#t-004 [in-progress] Verify failure rollback, consistency, concurrency, and boundary — belay show PLN-20260826T213447-001-atomic-work-creation#t-004
+- PLN-20260726T104808-001-validate-the-belay-route-protocol-before-product#t-011 [in-progress] 正常OK、曖昧OK、複数待機、Preview置換、stale Inputを含むend-to-end dogfoodを実施する — belay show PLN-20260726T104808-001-validate-the-belay-route-protocol-before-product#t-011
+- PLN-20260817T093100-001-agent-consumable-plan-en#t-006 [not-started] Independent Tier 3 review — belay show PLN-20260817T093100-001-agent-consumable-plan-en#t-006
+
+## Live entries
+- GOAL-20260925T214740-001-belay-guidance-boundarie [active] goal: belay-guidance-boundaries
+- DEC-20260906T204529-001-repair-context-dedupe [proposed] decision: repair-context-dedupe
+- REV-20260906T203742-001-sc-002-context-compile-d [pending] review: SC-002 context compile dedupe review
+- PLN-20260906T134828-001-context-cost-first-phase [active] plan: context-cost-first-phase
+- GOAL-20260906T134724-001-context-cost-reduction [active] goal: context-cost-reduction
+- NOTE-20260906T133449-001-routed-worker-policy-com [active] note: routed worker policy common
+- NOTE-20260906T133449-002-routed-worker-policy-imp [active] note: routed worker policy implement high
+- NOTE-20260906T133449-003-routed-worker-policy-imp [active] note: routed worker policy implement low
+- NOTE-20260906T133449-004-routed-worker-policy-imp [active] note: routed worker policy implement medium
+- NOTE-20260906T133449-005-routed-worker-policy-rev [active] note: routed worker policy review high
+- NOTE-20260906T133449-006-routed-worker-policy-rev [active] note: routed worker policy review low
+- NOTE-20260906T133449-007-routed-worker-policy-rev [active] note: routed worker policy review medium
+- PLN-20260901T091831-001-implement-evidence-show [active] plan: implement-evidence-show
+- GOAL-20260901T091831-001-direct-evidence-retrieva [active] goal: direct-evidence-retrieval
+- PLN-20260826T213447-001-atomic-work-creation [draft] plan: atomic-work-creation
+- WRK-20260826T215425-001-implement-task-derived-w [in-progress] work: Implement task-derived Work creation
+- GOAL-20260826T213421-001-atomic-work-creation [draft] goal: atomic-work-creation
+- DEC-20260826T213456-001-derive-goal-from-task [proposed] decision: derive-goal-from-task
+- GOAL-20260820T214155-001-retrieval-hygiene-archiv [active] goal: retrieval-hygiene-archive
+- PLN-20260820T214216-001-retrieval-hygiene-archiv [approved] plan: retrieval-hygiene-archive
+- GOAL-20260726T014020-001-enable-responsible-traceable-evolutionary-develo [active] goal: Deliver a safe CLI-first Belay Route MVP
+- GOAL-20260726T103644-001-make-belay-route-decision-state-legible-and-trus [draft] goal: Make Belay Route decision state legible and trustworthy in Browse
+- GOAL-20260729T204514-001-streamline-agent-workflow-output [active] goal: streamline-agent-workflow-output
+- GOAL-20260801T212650-001-risk-based-agent-workflo [draft] goal: risk-based-agent-workflow
+- GOAL-20260801T221649-001-configure-project-agent [draft] goal: configure-project-agent-models
+- GOAL-20260801T223214-001-configure-claude-agent-m [draft] goal: configure-claude-agent-models
+- GOAL-20260817T093055-001-agent-consumable-plan-en [active] goal: agent-consumable-plan-entries
+- GOAL-20260817T185935-001-library-status-include-e [active] goal: library-status-include-exclude
+- NOTE-20260712T134440-001-workflow-feedback-from-first-external-adoption-m [active] note: Workflow feedback from first external adoption (MarketTapestry)
+- NOTE-20260728T214040-001-human-multitasking-observation-and-post-route-au [active] note: Human multitasking observation and post-Route autonomy direction
+- NOTE-20260729T202616-001-keep-route-cli-first-and-reconsider-mcp-on-obser [active] note: Keep Route CLI-first and reconsider MCP on observed need
+- NOTE-20260730T185408-001-route-mvp-first-dogfood [active] note: route-mvp-first-dogfood
+- NOTE-20260811T124100-001-handoff-agent-config [active] note: handoff-agent-config
+- PLN-20260726T104808-001-validate-the-belay-route-protocol-before-product [approved] plan: Implement the CLI-first Route MVP
+- PLN-20260729T204610-001-align-agent-templates-and-output [approved] plan: align-agent-templates-and-output
+- PLN-20260801T212740-001-optimize-agent-workflow [approved] plan: optimize-agent-workflow
+- PLN-20260801T221653-001-configure-project-agents [approved] plan: configure-project-agents
+- PLN-20260801T223214-001-configure-claude-agents [approved] plan: configure-claude-agents
+- PLN-20260817T093100-001-agent-consumable-plan-en [approved] plan: agent-consumable-plan-entries
+- PLN-20260817T190256-001-library-status-include-e [approved] plan: library-status-include-exclude
+- WRK-20260730T191516-001-conversational-preview-a [in-progress] work: conversational-preview-approval
+- WRK-20260817T094502-001-fragment-scoped-show [in-progress] work: fragment-scoped-show
+- WRK-20260817T095130-001-plan-lint-structural-che [in-progress] work: plan-lint-structural-checks
+- WRK-20260817T095933-001-task-section-docs-and-co [in-progress] work: task-section-docs-and-concurrency
+
+## Goals
+- GOAL-20260925T214740-001-belay-guidance-boundarie [active]: belay-guidance-boundaries
+  Success Criteria: - [SC-001] Generic skill defers review and human acceptance requirements to consumer policy and Goal, supports concise Intent Briefs without empty placeholders, and ships a discoverable Route reference through generation, installation and doctor checks with existing safety and trace contracts preserved.
+  Constraints: - Preserve ID, Task/SC, Evidence, conflict safety, Route approval and native permissions. Preserve existing user changes.
+  Non-goals: - Erwin, model routing, AGENTS/CLAUDE policy, installed consumer settings, schema/coverage semantics, push or deployment.
+- GOAL-20260906T134724-001-context-cost-reduction [active]: context-cost-reduction
+  Success Criteria: - [SC-001] 固定fixtureと計測手順があり、変更前revision、出力bytes、推定tokens、必須情報、追加取得回数を再現可能に比較できる。 - [SC-002] task指定compileとworking-set compileで同一entryの説明を重複掲載せず、canonical参照と必要情報を保持する。重複fixtureでは変更前より推定tokensが減少する。 - [SC-003] focus packetがUnknowns / Decisions Neededを保持し、必須情報をbudgetで黙って欠落させない。...
+  Constraints: - Deterministic coreを維持し、LLM呼び出し、schema migration、ID標準変更は行わない。 - 制約、Non-goals、未解決事項、Task Acceptance/Verification、Goal item、Evidenceへの参照を短縮のために失わない。 - 実装はTier 3の出力契約変更として、2026-09-06の人間によるPlan指定の実装依頼を承認根拠とする。 - installed skill、agent設定、既存履歴のstatusは変更しない。
+  Non-goals: - 第1段階ではSkill分割、メタデータ表示オプション、検索ランキング変更、履歴のarchive、実課金削減率の保証を行わない。
+- GOAL-20260901T091831-001-direct-evidence-retrieva [active]: direct-evidence-retrieval
+  Success Criteria: - [SC-001] validなexact `EVD-...`に対する`belay show`が、SQLiteに未indexでも`.belay/evidence/*.ndjson`から一意に解決し、schema、ID、kind、verdict、commit、captured_at、issuer、source、summary、detail、links、source locationを安定した形式で表示する。 - [SC-002] unique EVD prefixは一件だけ解決し、zero match、ambiguous prefix、duplicate ID、malformed/unsupported schemaは状態を変更せず明確な非zeroでfail-closedになる。Evidence fragment、slug、Entry mutation semanticsは受け付けない。 - [SC-003] `belay sync`がmirror-only EvidenceをSQLite...
+  Constraints: - NDJSON Evidenceはappend-onlyとし、`show`や`sync`で書換え・deduplicate・managed Markdown化しない。 - Existing Entry `show`、fragment、unique prefix/slug behaviorとexit statusを後方互換に保つ。 - EvidenceをEntry statusや通常の`belay link` mutation対象へ拡張しない。 - sync/rebuildは不正・重複Evidenceを黙って無視せず、既存の正常indexを破損させない。
+  Non-goals: - Herdr runnerをBelay `show`出力のparserへ変更しない。 - Evidence schema、freshness判定、coverage算出、Evidence mutation APIを再設計しない。 - erwinやconsumer repositoryをこのGoalから変更・installしない。
+- GOAL-20260826T213421-001-atomic-work-creation [draft]: atomic-work-creation
+  Success Criteria: - [SC-001] A valid Plan task creates exactly one Work with its `implements` Task link and the derived Goal `fulfills` link in one mutation. - [SC-002] Task-to-Goal derivation rejects missing, invalid, ambiguous, or non-canonical mappings before creating any Work. - [SC-003] Machine callers can obtain the created Work ID without parsing human prose, while existing `add` and `link` commands remain compatible. - [SC-004] Tests demonstrate failure non-creation, mirror/SQLite consistency, concurrent safety, and documented command behavior.
+  Constraints: - Keep Belay deterministic and local-first; do not add...

@@ -1,0 +1,371 @@
+diff --git a/scripts/omnia_contract.py b/scripts/omnia_contract.py
+index 55176b7..516dd5a 100644
+--- a/scripts/omnia_contract.py
++++ b/scripts/omnia_contract.py
+@@ -24,7 +24,9 @@ SCHEMA_DIR = ROOT / "tests" / "omnia_contract" / "schemas"
+ 
+ 
+ class ContractError(ValueError):
+-    pass
++    def __init__(self, message: str, error_path: str | None = None) -> None:
++        super().__init__(message)
++        self.error_path = error_path
+ 
+ 
+ class StdoutArgumentParser(argparse.ArgumentParser):
+@@ -41,31 +43,37 @@ def _is_integer(value: Any) -> bool:
+     return isinstance(value, int) and not isinstance(value, bool)
+ 
+ 
++def _property_path(path: str, key: str) -> str:
++    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
++        return f"{path}.{key}"
++    return f"{path}[{json.dumps(key, ensure_ascii=False)}]"
++
++
+ def _timestamp(value: str, path: str) -> datetime:
+     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+-        raise ContractError(f"{path}: must be an RFC3339 UTC timestamp with second precision")
++        raise ContractError(f"{path}: must be an RFC3339 UTC timestamp with second precision", path)
+     try:
+         return datetime.fromisoformat(value[:-1] + "+00:00")
+     except ValueError as exc:
+-        raise ContractError(f"{path}: invalid timestamp") from exc
++        raise ContractError(f"{path}: invalid timestamp", path) from exc
+ 
+ 
+ def _capsule_timestamp(value: Any, path: str) -> datetime:
+     if not isinstance(value, str) or not re.fullmatch(
+             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z", value):
+-        raise ContractError(f"{path}: must be an RFC3339 UTC timestamp")
++        raise ContractError(f"{path}: must be an RFC3339 UTC timestamp", path)
+     try:
+         return datetime.fromisoformat(value[:-1] + "+00:00")
+     except ValueError as exc:
+-        raise ContractError(f"{path}: invalid timestamp") from exc
++        raise ContractError(f"{path}: invalid timestamp", path) from exc
+ 
+ 
+ def _validate(value: Any, schema: dict[str, Any], path: str = "$") -> None:
+     if "const" in schema and (type(value) is not type(schema["const"]) or
+                               value != schema["const"]):
+-        raise ContractError(f"{path}: expected {schema['const']!r}")
++        raise ContractError(f"{path}: expected {schema['const']!r}", path)
+     if "enum" in schema and value not in schema["enum"]:
+-        raise ContractError(f"{path}: invalid value {value!r}")
++        raise ContractError(f"{path}: invalid value {value!r}", path)
+     kind = schema.get("type")
+     valid = {
+         "object": isinstance(value, dict),
+@@ -75,40 +83,46 @@ def _validate(value: Any, schema: dict[str, Any], path: str = "$") -> None:
+         "boolean": isinstance(value, bool),
+     }.get(kind, True)
+     if not valid:
+-        raise ContractError(f"{path}: expected {kind}")
++        raise ContractError(f"{path}: expected {kind}", path)
+     if kind == "object":
+         properties = schema.get("properties", {})
+         missing = [key for key in schema.get("required", []) if key not in value]
+         if missing:
+-            raise ContractError(f"{path}: missing required field(s): {', '.join(missing)}")
++            raise ContractError(
++                f"{path}: missing required field(s): {', '.join(missing)}",
++                _property_path(path, missing[0]),
++            )
+         if schema.get("additionalProperties") is False:
+             unknown = sorted(set(value) - set(properties))
+             if unknown:
+-                raise ContractError(f"{path}: unknown field(s): {', '.join(unknown)}")
++                raise ContractError(
++                    f"{path}: unknown field(s): {', '.join(unknown)}",
++                    _property_path(path, unknown[0]),
++                )
+         for key, child in value.items():
+             if key in properties:
+-                _validate(child, properties[key], f"{path}.{key}")
++                _validate(child, properties[key], _property_path(path, key))
+     elif kind == "array":
+         if len(value) < schema.get("minItems", 0):
+-            raise ContractError(f"{path}: too few items")
++            raise ContractError(f"{path}: too few items", path)
+         if schema.get("uniqueItems"):
+             seen: set[bytes] = set()
+-            for child in value:
++            for index, child in enumerate(value):
+                 encoded = canonical_bytes(child)
+                 if encoded in seen:
+-                    raise ContractError(f"{path}: duplicate item")
++                    raise ContractError(f"{path}: duplicate item", f"{path}[{index}]")
+                 seen.add(encoded)
+         for index, child in enumerate(value):
+             _validate(child, schema.get("items", {}), f"{path}[{index}]")
+     elif kind == "string":
+         if len(value) < schema.get("minLength", 0):
+-            raise ContractError(f"{path}: string is too short")
++            raise ContractError(f"{path}: string is too short", path)
+         if "pattern" in schema and not re.fullmatch(schema["pattern"], value):
+-            raise ContractError(f"{path}: invalid format")
++            raise ContractError(f"{path}: invalid format", path)
+         if schema.get("format") == "date-time":
+             _timestamp(value, path)
+     elif kind == "integer" and value < schema.get("minimum", value):
+-        raise ContractError(f"{path}: below minimum")
++        raise ContractError(f"{path}: below minimum", path)
+ 
+ 
+ def load_schema(name: str) -> dict[str, Any]:
+@@ -140,43 +154,50 @@ def _unique_ids(items: list[dict[str, Any]], path: str) -> None:
+     ids = [item["id"] for item in items]
+     duplicates = sorted({item_id for item_id in ids if ids.count(item_id) > 1})
+     if duplicates:
+-        raise ContractError(f"{path}: duplicate id(s): {', '.join(duplicates)}")
++        raise ContractError(f"{path}: duplicate id(s): {', '.join(duplicates)}", path)
+ 
+ 
+ def validate_draft(value: Any) -> dict[str, Any]:
+     """Shape only; never establishes issuability, completeness or confirmation."""
+     _validate(value, load_schema("confirmed-input"))
+     if value["status"] != "draft":
+-        raise ContractError("$.status: draft validation requires draft status")
++        raise ContractError("$.status: draft validation requires draft status", "$.status")
+     return value
+ 
+ 
+ def validate_input(value: Any) -> dict[str, Any]:
+     _validate(value, load_schema("confirmed-input"))
+     if value["status"] != "confirmed" or value["unknowns"]:
+-        raise ContractError("$: unresolved or draft input cannot be issued")
++        path = "$.status" if value["status"] != "confirmed" else "$.unknowns"
++        raise ContractError("$: unresolved or draft input cannot be issued", path)
+     if value["compiler_version"] != COMPILER_VERSION:
+-        raise ContractError("$.compiler_version: unsupported compiler version")
++        raise ContractError("$.compiler_version: unsupported compiler version", "$.compiler_version")
+     if "expires_at" in value and _timestamp(value["expires_at"], "$.expires_at") <= _timestamp(value["issued_at"], "$.issued_at"):
+-        raise ContractError("$.expires_at: must be later than issued_at")
++        raise ContractError("$.expires_at: must be later than issued_at", "$.expires_at")
+     sources = value["source_bundle"]["sources"]
+     _unique_ids(sources, "$.source_bundle.sources")
+     source_ids = {source["id"] for source in sources}
+-    if not all(source["complete"] for source in sources):
+-        raise ContractError("$.source_bundle.sources: incomplete source cannot be issued")
++    for index, source in enumerate(sources):
++        if not source["complete"]:
++            raise ContractError(
++                "$.source_bundle.sources: incomplete source cannot be issued",
++                f"$.source_bundle.sources[{index}].complete",
++            )
+     bundle_payload = {key: child for key, child in value["source_bundle"].items()
+                       if key != "bundle_digest"}
+     bundle_digest = "sha256:" + hashlib.sha256(canonical_bytes(bundle_payload)).hexdigest()
+     if value["source_bundle"]["bundle_digest"] != bundle_digest:
+-        raise ContractError("$.source_bundle.bundle_digest: does not match canonical manifest")
++        raise ContractError("$.source_bundle.bundle_digest: does not match canonical manifest",
++                            "$.source_bundle.bundle_digest")
+     if set(value["context_refs"]) - source_ids:
+-        raise ContractError("$.context_refs: missing source ref")
++        raise ContractError("$.context_refs: missing source ref", "$.context_refs")
+     for group in ("requirements", "acceptance_criteria"):
+         _unique_ids(value[group], f"$.{group}")
+         for index, item in enumerate(value[group]):
+             missing = sorted(set(item["source_refs"]) - source_ids)
+             if missing:
+-                raise ContractError(f"$.{group}[{index}].source_refs: missing source ref(s): {', '.join(missing)}")
++                path = f"$.{group}[{index}].source_refs"
++                raise ContractError(f"{path}: missing source ref(s): {', '.join(missing)}", path)
+     return value
+ 
+ 
+@@ -202,7 +223,7 @@ def validate_contract(value: Any) -> dict[str, Any]:
+     validate_input(confirmed_shape)
+     actual = "sha256:" + hashlib.sha256(canonical_bytes(_without_digest(value))).hexdigest()
+     if value["contract_digest"] != actual:
+-        raise ContractError("$.contract_digest: does not match canonical payload")
++        raise ContractError("$.contract_digest: does not match canonical payload", "$.contract_digest")
+     return value
+ 
+ 
+@@ -221,22 +242,26 @@ def validate_capsule(value: Any) -> dict[str, Any]:
+         evidence_ids: set[str] = set()
+         for evidence in criterion["evidence"]:
+             if evidence["id"] in evidence_ids:
+-                raise ContractError(f"$.criteria[{index}].evidence: duplicate evidence id {evidence['id']}")
++                path = f"$.criteria[{index}].evidence"
++                raise ContractError(f"{path}: duplicate evidence id {evidence['id']}", path)
+             evidence_ids.add(evidence["id"])
+             identity = (evidence["artifact_sha256"], evidence["state"])
+             previous = evidence_identity.setdefault(evidence["id"], identity)
+             if previous != identity:
+                 raise ContractError(
+-                    f"$.criteria[{index}].evidence: inconsistent reuse of evidence id {evidence['id']}"
++                    f"$.criteria[{index}].evidence: inconsistent reuse of evidence id {evidence['id']}",
++                    f"$.criteria[{index}].evidence",
+                 )
+         states = {evidence["state"] for evidence in criterion["evidence"]}
+         if criterion["verification"] == "verified" and (not states or states != {"passing"}):
+-            raise ContractError(f"$.criteria[{index}]: verified requires only passing evidence")
++            path = f"$.criteria[{index}].verification"
++            raise ContractError(f"$.criteria[{index}]: verified requires only passing evidence", path)
+         expected = ("failed" if "failed" in states else
+                     "verified" if states == {"passing"} else
+                     "partial" if "passing" in states else "unverified")
+         if criterion["verification"] != expected:
+-            raise ContractError(f"$.criteria[{index}]: expected {expected} from evidence states")
++            path = f"$.criteria[{index}].verification"
++            raise ContractError(f"$.criteria[{index}]: expected {expected} from evidence states", path)
+     criterion_states = {criterion["verification"] for criterion in mappings}
+     if "failed" in criterion_states:
+         aggregate_verification = "failed"
+@@ -248,14 +273,16 @@ def validate_capsule(value: Any) -> dict[str, Any]:
+         aggregate_verification = "partial"
+     if value["verification"] != aggregate_verification:
+         raise ContractError(
+-            f"$.verification: expected {aggregate_verification!r} from criterion states"
++            f"$.verification: expected {aggregate_verification!r} from criterion states",
++            "$.verification",
+         )
+ 
+     acceptance = value["human_acceptance"]
+     binding = value.get("human_acceptance_binding")
+     if acceptance in {"accepted", "rejected"}:
+         if binding is None:
+-            raise ContractError(f"$.human_acceptance_binding: required for {acceptance}")
++            raise ContractError(f"$.human_acceptance_binding: required for {acceptance}",
++                                "$.human_acceptance_binding")
+         expected_operation = {"accepted": "accept", "rejected": "reject"}[acceptance]
+         for field, expected in (
+             ("contract_id", value["contract_id"]),
+@@ -264,7 +291,8 @@ def validate_capsule(value: Any) -> dict[str, Any]:
+             ("operation", expected_operation),
+         ):
+             if binding[field] != expected:
+-                raise ContractError(f"$.human_acceptance_binding.{field}: does not bind current capsule")
++                path = f"$.human_acceptance_binding.{field}"
++                raise ContractError(f"{path}: does not bind current capsule", path)
+         expected_evidence = sorted(
+             (evidence["id"], evidence["artifact_sha256"], evidence["state"])
+             for criterion in mappings for evidence in criterion["evidence"]
+@@ -274,9 +302,11 @@ def validate_capsule(value: Any) -> dict[str, Any]:
+             for evidence in binding["evidence"]
+         )
+         if bound_evidence != expected_evidence:
+-            raise ContractError("$.human_acceptance_binding.evidence: does not bind current evidence set")
++            raise ContractError("$.human_acceptance_binding.evidence: does not bind current evidence set",
++                                "$.human_acceptance_binding.evidence")
+     elif binding is not None:
+-        raise ContractError("$.human_acceptance_binding: pending acceptance cannot carry a binding")
++        raise ContractError("$.human_acceptance_binding: pending acceptance cannot carry a binding",
++                            "$.human_acceptance_binding")
+     return value
+ 
+ 
+@@ -287,7 +317,8 @@ def validate_identity_set(contracts: list[Any]) -> None:
+         identity = (validated["contract_id"], validated["revision"])
+         previous = identities.setdefault(identity, validated["contract_digest"])
+         if previous != validated["contract_digest"]:
+-            raise ContractError(f"contract identity collision: {identity[0]} revision {identity[1]}")
++            raise ContractError(f"contract identity collision: {identity[0]} revision {identity[1]}",
++                                "$.contract_digest")
+ 
+ 
+ def projection_preview(contract: Any) -> dict[str, Any]:
+@@ -354,7 +385,9 @@ def main(argv: list[str] | None = None) -> int:
+         sys.stdout.write(canonical_bytes(result).decode("utf-8"))
+         return 0
+     except (ContractError, OSError, json.JSONDecodeError) as exc:
+-        sys.stdout.write(canonical_bytes({"error": str(exc), "valid": False}).decode("utf-8"))
++        error_path = exc.error_path if isinstance(exc, ContractError) else None
++        sys.stdout.write(canonical_bytes({"error": str(exc), "error_path": error_path,
++                                          "valid": False}).decode("utf-8"))
+         return 2
+ 
+ 
+diff --git a/tests/omnia_contract/test_contract.py b/tests/omnia_contract/test_contract.py
+index 8951146..7c8b974 100644
+--- a/tests/omnia_contract/test_contract.py
++++ b/tests/omnia_contract/test_contract.py
+@@ -5,6 +5,7 @@ import json
+ from contextlib import redirect_stderr, redirect_stdout
+ from pathlib import Path
+ import unittest
++from unittest import mock
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ SPEC = importlib.util.spec_from_file_location("omnia_contract", ROOT / "scripts" / "omnia_contract.py")
+@@ -181,13 +182,75 @@ class ContractTests(unittest.TestCase):
+             result = omnia.main(["validate", str(FIXTURES / "confirmed-input.json")])
+         self.assertEqual(result, 0)
+         self.assertEqual(stderr.getvalue(), "")
+-        self.assertTrue(json.loads(stdout.getvalue())["valid"])
++        self.assertEqual(stdout.getvalue(), '{"kind":"input","valid":true}\n')
+         stdout, stderr = io.StringIO(), io.StringIO()
+         with redirect_stdout(stdout), redirect_stderr(stderr):
+             result = omnia.main(["validate"])
+         self.assertEqual(result, 2)
+         self.assertEqual(stderr.getvalue(), "")
+-        self.assertFalse(json.loads(stdout.getvalue())["valid"])
++        self.assertEqual(json.loads(stdout.getvalue())["error_path"], None)
++
++    def test_cli_reports_exact_structured_validation_paths(self):
++        cases = []
++
++        incomplete = copy.deepcopy(self.confirmed)
++        incomplete["source_bundle"]["sources"][0]["complete"] = False
++        cases.append((
++            incomplete,
++            "$.source_bundle.sources: incomplete source cannot be issued",
++            "$.source_bundle.sources[0].complete",
++        ))
++
++        missing = copy.deepcopy(self.confirmed)
++        del missing["source_bundle"]["sources"][0]["complete"]
++        cases.append((
++            missing,
++            "$.source_bundle.sources[0]: missing required field(s): complete",
++            "$.source_bundle.sources[0].complete",
++        ))
++
++        unknown = copy.deepcopy(self.confirmed)
++        unknown["target"]["surprise"] = True
++        cases.append((
++            unknown,
++            "$.target: unknown field(s): surprise",
++            "$.target.surprise",
++        ))
++
++        for value, error, error_path in cases:
++            stdout, stderr = io.StringIO(), io.StringIO()
++            with self.subTest(error_path=error_path), \
++                    mock.patch.object(omnia, "_read", return_value=value), \
++                    redirect_stdout(stdout), redirect_stderr(stderr):
++                result = omnia.main(["validate", "synthetic.json"])
++            self.assertEqual(result, 2)
++            self.assertEqual(stderr.getvalue(), "")
++            self.assertEqual(json.loads(stdout.getvalue()), {
++                "error": error,
++                "error_path": error_path,
++                "valid": False,
++            })
++
++    def test_unknown_key_paths_quote_ambiguous_json_names(self):
++        for key, error_path in (
++            ("child.name", '$.target["child.name"]'),
++            ("child[0]", '$.target["child[0]"]'),
++            ('child"name', '$.target["child\\"name"]'),
++            ("child\\name", '$.target["child\\\\name"]'),
++            ("", '$.target[""]'),
++        ):
++            value = copy.deepcopy(self.confirmed)
++            value["target"][key] = True
++            stdout, stderr = io.StringIO(), io.StringIO()
++            with self.subTest(key=key), \
++                    mock.patch.object(omnia, "_read", return_value=value), \
++                    redirect_stdout(stdout), redirect_stderr(stderr):
++                result = omnia.main(["validate", "synthetic.json"])
++            self.assertEqual(result, 2)
++            self.assertEqual(stderr.getvalue(), "")
++            diagnostic = json.loads(stdout.getvalue())
++            self.assertEqual(diagnostic["error"], f"$.target: unknown field(s): {key}")
++            self.assertEqual(diagnostic["error_path"], error_path)
+ 
+ 
+ if __name__ == "__main__":

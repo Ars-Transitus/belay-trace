@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "contract_id": "OMNIA-DOGFOOD-001",
+  "contract_revision": 1,
+  "contract_digest": "sha256:57f6467d37842bf6d42d5d7c10534c79d887693dd7362722118e5316d9ac6c17",
+  "evaluated_as_of": "2026-10-01T12:48:39Z",
+  "execution": "completed",
+  "verification": "verified",
+  "human_acceptance": "pending",
+  "lifecycle": "active",
+  "source_freshness": "unknown",
+  "criteria": [
+    {
+      "id": "AC-001",
+      "verification": "verified",
+      "evidence": [
+        {
+          "id": "EVD-b5e18075af64c5129ba02a1c96d1abcd",
+          "artifact_sha256": "sha256:8086740c984799ed7a0cf590d1c5224c46ee7deeee4304514895f3db1b122053",
+          "state": "passing"
+        }
+      ]
+    },
+    {
+      "id": "AC-002",
+      "verification": "verified",
+      "evidence": [
+        {
+          "id": "EVD-b5e18075af64c5129ba02a1c96d1abcd",
+          "artifact_sha256": "sha256:8086740c984799ed7a0cf590d1c5224c46ee7deeee4304514895f3db1b122053",
+          "state": "passing"
+        }
+      ]
+    },
+    {
+      "id": "AC-003",
+      "verification": "verified",
+      "evidence": [
+        {
+          "id": "EVD-b5e18075af64c5129ba02a1c96d1abcd",
+          "artifact_sha256": "sha256:8086740c984799ed7a0cf590d1c5224c46ee7deeee4304514895f3db1b122053",
+          "state": "passing"
+        }
+      ]
+    },
+    {
+      "id": "AC-004",
+      "verification": "verified",
+      "evidence": [
+        {
+          "id": "EVD-b5e18075af64c5129ba02a1c96d1abcd",
+          "artifact_sha256": "sha256:8086740c984799ed7a0cf590d1c5224c46ee7deeee4304514895f3db1b122053",
+          "state": "passing"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "external": {},
+  "records": [
+    {
+      "contract_digest": "sha256:57f6467d37842bf6d42d5d7c10534c79d887693dd7362722118e5316d9ac6c17",
+      "contract_id": "OMNIA-DOGFOOD-001",
+      "contract_revision": 1,
+      "goal_id": "GOAL-20261001T121751-541-add-machine-readable-exact-fai-r1-57f6467d",
+      "plan_id": "PLN-20261001T121751-541-add-machine-readable-exact-fai-r1-57f6467d",
+      "preview_digest": "sha256:e77026917d8ed96ecffcb41397d7e1afc5d0167baa56b475746c7b4000e3a392",
+      "receipt_sha256": "sha256:47eff4b95c7a6beff8e6a64707fd9566c5f51aaead919b9c8184e0b5c63fa6eb",
+      "repository": "github.com/Ars-Transitus/belay-trace",
+      "sources": [
+        {
+          "source_id": "SRC-PLAN",
+          "source_url": "https://app.notion.com/p/Omnia-Belay-Integration-3b8c2ad7b43180d7a0a8d78e58d2392b"
+        }
+      ]
+    }
+  ],
+  "repository": "github.com/Ars-Transitus/belay-trace",
+  "schema_version": 1
+}

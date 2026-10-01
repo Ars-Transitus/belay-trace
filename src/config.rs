@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::BelayError;
 
 pub const CONFIG_SCHEMA_VERSION: u32 = 1;
+pub const CONTRACT_STORAGE_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -89,6 +90,13 @@ impl Default for Config {
 
 impl Config {
     pub fn load(path: &Path) -> Result<Self, BelayError> {
+        Self::load_compatible(path, CONTRACT_STORAGE_SCHEMA_VERSION)
+    }
+
+    /// Load configuration as a writer that understands formats only through
+    /// `maximum_schema`. This is the compatibility gate used by released
+    /// writers: a schema-2-only writer must reject Contract storage schema 3.
+    pub fn load_compatible(path: &Path, maximum_schema: u32) -> Result<Self, BelayError> {
         let contents = fs::read_to_string(path).map_err(|source| BelayError::Config {
             path: path.to_path_buf(),
             message: source.to_string(),
@@ -98,7 +106,7 @@ impl Config {
                 path: path.to_path_buf(),
                 message: source.to_string(),
             })?;
-        config.validate(path)?;
+        config.validate(path, maximum_schema)?;
         Ok(config)
     }
 
@@ -108,13 +116,13 @@ impl Config {
         })
     }
 
-    fn validate(&self, path: &Path) -> Result<(), BelayError> {
-        if self.schema_version != CONFIG_SCHEMA_VERSION {
+    fn validate(&self, path: &Path, maximum_schema: u32) -> Result<(), BelayError> {
+        if self.schema_version == 0 || self.schema_version > maximum_schema {
             return Err(BelayError::InvalidConfig {
                 path: path.to_path_buf(),
                 message: format!(
                     "unsupported config schema version {}; expected {}",
-                    self.schema_version, CONFIG_SCHEMA_VERSION
+                    self.schema_version, maximum_schema
                 ),
             });
         }

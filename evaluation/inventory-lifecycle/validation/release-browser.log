@@ -1,0 +1,12 @@
+
+> test:e2e
+> playwright test
+
+
+Running 1 test using 1 worker
+
+(node:15181) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/e2e/browse.spec.js:50:1 › Library, Reader, provenance, staged Explore, reload, and read-only invariant (3.1s)
+
+  1 passed (4.6s)

@@ -57,6 +57,9 @@ pub struct DoctorReport {
 
 #[derive(Debug, Clone)]
 struct MirrorRecord {
+    packed: bool,
+    has_packed_history: bool,
+    raw_hash: String,
     path: PathBuf,
     source_path: String,
     entry: Entry,
@@ -90,6 +93,7 @@ pub fn synchronize(
     target: Option<&str>,
     preference: Option<SyncPreference>,
 ) -> Result<SyncReport, BelayError> {
+    let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     if let Some(target) = target {
         parse_display_id(target)?;
     }
@@ -349,8 +353,10 @@ fn restore_missing_database_entries(
                 .map_err(|source| BelayError::sqlite(&database_path, source))?;
         }
         let mut entry = mirror.entry.clone();
-        entry.revision = 1;
-        entry.updated_at = import_timestamp(&entry.created_at)?;
+        if !(mirror.packed || mirror.has_packed_history) {
+            entry.revision = 1;
+            entry.updated_at = import_timestamp(&entry.created_at)?;
+        }
         let entry = entry.normalized()?;
         let internal_id =
             store::insert_entry(&transaction, &database_path, &entry, &mirror.source_path)?;
@@ -370,7 +376,9 @@ fn restore_missing_database_entries(
             &entry.updated_at,
         )?;
         let rendered = markdown::render(entry)?;
-        store::replace_file(repository, &mirror.path, rendered.as_bytes(), &mirror.hash)?;
+        if !(mirror.packed || mirror.has_packed_history) {
+            store::replace_file(repository, &mirror.path, rendered.as_bytes(), &mirror.hash)?;
+        }
     }
     transaction.commit()
 }
@@ -446,6 +454,15 @@ fn sync_one(
     stale_baseline: Option<&Baseline>,
     preference: Option<SyncPreference>,
 ) -> Result<&'static str, BelayError> {
+    if let Some(mirror) = mirror_record {
+        crate::contract::validate_entry_projection(repository, &mirror.entry)?;
+    }
+    if let Some(database) = database_record {
+        let database_path = repository.database_path();
+        let connection = database::open_read_only(&database_path)?;
+        let entry = store::load_entry(&connection, &database_path, database.internal_id)?;
+        crate::contract::validate_entry_projection(repository, &entry)?;
+    }
     match (database_record, mirror_record) {
         (None, None) => Err(BelayError::Conflict {
             message: format!("entry {display_id} is missing from both SQLite and Markdown"),
@@ -459,6 +476,20 @@ fn sync_one(
             Ok("rendered SQLite and restored Markdown")
         }
         (Some(database), Some(mirror)) => {
+            if mirror.packed || mirror.has_packed_history {
+                let path = repository.database_path();
+                let connection = database::open_read_only(&path)?;
+                let indexed = store::load_entry(&connection, &path, database.internal_id)?;
+                drop(connection);
+                if indexed.revision > mirror.entry.revision {
+                    write_sqlite(repository, database, Some(mirror))?;
+                    return Ok("preserved newer SQLite revision and restored loose original");
+                }
+                if indexed.revision < mirror.entry.revision {
+                    import_markdown(repository, Some(database), mirror, None)?;
+                    return Ok("restored exact original revision to SQLite");
+                }
+            }
             if let Some(preference) = preference {
                 return match preference {
                     SyncPreference::Markdown => {
@@ -529,19 +560,23 @@ fn import_markdown(
     let transaction = begin_immediate(&mut connection, &database_path)?;
     let sync_time = now();
 
-    let (internal_id, entry) = if let Some(database_record) = database_record {
+    let (internal_id, entry, preserve_original) = if let Some(database_record) = database_record {
         let current = store::load_entry(&transaction, &database_path, database_record.internal_id)?;
         ensure_database_snapshot(&transaction, &database_path, database_record, &current)?;
+        let preserve_original = mirror.packed
+            || (mirror.has_packed_history && current.revision < mirror.entry.revision);
         let mut imported = mirror.entry.clone();
-        imported.created_at = current.created_at;
-        imported.revision =
-            current
-                .revision
-                .checked_add(1)
-                .ok_or_else(|| BelayError::Validation {
-                    message: format!("entry {} revision overflowed", current.display_id),
-                })?;
-        imported.updated_at = sync_time;
+        if !preserve_original {
+            imported.created_at = current.created_at;
+            imported.revision =
+                current
+                    .revision
+                    .checked_add(1)
+                    .ok_or_else(|| BelayError::Validation {
+                        message: format!("entry {} revision overflowed", current.display_id),
+                    })?;
+            imported.updated_at = sync_time;
+        }
         let imported = imported.normalized()?;
         store::replace_entry(
             &transaction,
@@ -556,7 +591,7 @@ fn import_markdown(
             database_record.internal_id,
             &imported.links,
         )?;
-        (database_record.internal_id, imported)
+        (database_record.internal_id, imported, preserve_original)
     } else {
         if let Some(stale_baseline) = stale_baseline {
             cleanup_orphaned_entry_rows(&transaction, &database_path, stale_baseline.entry_id)?;
@@ -567,14 +602,17 @@ fn import_markdown(
                 )
                 .map_err(|source| BelayError::sqlite(&database_path, source))?;
         }
+        let preserve_original = mirror.packed || mirror.has_packed_history;
         let mut imported = mirror.entry.clone();
-        imported.revision = 1;
-        imported.updated_at = import_timestamp(&imported.created_at)?;
+        if !preserve_original {
+            imported.revision = 1;
+            imported.updated_at = import_timestamp(&imported.created_at)?;
+        }
         let imported = imported.normalized()?;
         let internal_id =
             store::insert_entry(&transaction, &database_path, &imported, &mirror.source_path)?;
         store::replace_links(&transaction, &database_path, internal_id, &imported.links)?;
-        (internal_id, imported)
+        (internal_id, imported, preserve_original)
     };
 
     let hash = markdown::content_hash(&entry)?;
@@ -587,7 +625,9 @@ fn import_markdown(
         &hash,
         &entry.updated_at,
     )?;
-    store::replace_file(repository, &mirror.path, rendered.as_bytes(), &mirror.hash)?;
+    if !preserve_original {
+        store::replace_file(repository, &mirror.path, rendered.as_bytes(), &mirror.hash)?;
+    }
     transaction.commit()
 }
 
@@ -721,7 +761,11 @@ pub struct RebuildOutcome {
 }
 
 pub fn rebuild(repository: &Repository) -> Result<RebuildOutcome, BelayError> {
+    let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     let inventory = discover_mirrors(repository)?;
+    for mirror in inventory.entries.values() {
+        crate::contract::validate_entry_projection(repository, &mirror.entry)?;
+    }
     validate_link_targets(&inventory)?;
     let database_path = repository.database_path();
     database_path
@@ -1024,6 +1068,29 @@ pub fn doctor(repository: &Repository) -> DoctorReport {
         }
     };
 
+    match crate::evidence::read_located_mirrors(repository) {
+        Ok(records) => checks.push(DoctorCheck {
+            name: "Evidence original storage".into(),
+            status: "ok",
+            detail: format!("{} validated records", records.len()),
+        }),
+        Err(error) => {
+            has_invalid = true;
+            checks.push(DoctorCheck {
+                name: "Evidence original storage".into(),
+                status: "invalid",
+                detail: error.to_string(),
+            });
+        }
+    }
+    if let Err(error) = crate::evidence::validate_index_sources(repository) {
+        has_drift = true;
+        checks.push(DoctorCheck {
+            name: "Evidence index".into(),
+            status: "drift",
+            detail: error.to_string(),
+        });
+    }
     let database_path = repository.database_path();
     match database::open_read_only(&database_path) {
         Ok(connection) => {
@@ -1324,6 +1391,43 @@ fn discover_mirrors(repository: &Repository) -> Result<MirrorInventory, BelayErr
         let directory = repository.entries_path().join(entry_type.directory());
         discover_directory(repository, entry_type, &directory, &mut inventory)?;
     }
+    for packed in crate::pack::read_entries(repository)? {
+        let id = packed.entry.display_id.clone();
+        if let Some(live) = inventory.entries.get_mut(&id) {
+            if live.entry.revision == packed.entry.revision {
+                if live.raw_hash != packed.raw_hash {
+                    return validation(format!(
+                        "conflicting ID/revision {id}@{} between loose original and pack",
+                        packed.entry.revision
+                    ));
+                }
+                // A byte-identical restored twin is a verified historical
+                // original too. Preserve its revision and bytes on import.
+                live.packed = true;
+                live.has_packed_history = true;
+                continue;
+            }
+            if live.entry.revision > packed.entry.revision {
+                // Its packed predecessor protects the raw revision during
+                // index recovery; ordinary edits still create a new revision.
+                live.has_packed_history = true;
+                continue;
+            }
+        }
+        let hash = markdown::content_hash(&packed.entry)?;
+        inventory.entries.insert(
+            id,
+            MirrorRecord {
+                packed: true,
+                has_packed_history: true,
+                raw_hash: packed.raw_hash,
+                path: repository.belay_dir.join(&packed.original_path),
+                source_path: packed.original_path,
+                entry: packed.entry,
+                hash,
+            },
+        );
+    }
     Ok(inventory)
 }
 
@@ -1408,6 +1512,9 @@ fn discover_directory(
         let hash = markdown::content_hash(&entry)?;
         let display_id = entry.display_id.clone();
         let record = MirrorRecord {
+            packed: false,
+            has_packed_history: false,
+            raw_hash: crate::lifecycle::hash(contents.as_bytes()),
             path,
             source_path,
             entry,

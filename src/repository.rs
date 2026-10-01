@@ -130,6 +130,14 @@ fn ensure_layout(repository: &Repository) -> Result<(), BelayError> {
     ensure_managed_directory(&repository.belay_dir, Path::new("agent/codex"))?;
     ensure_managed_directory(&repository.belay_dir, Path::new("agent/claude"))?;
     ensure_managed_directory(&repository.belay_dir, Path::new("evidence"))?;
+    ensure_managed_directory(&repository.belay_dir, Path::new("evidence/records"))?;
+    ensure_managed_directory(&repository.belay_dir, Path::new("lifecycle"))?;
+    let lock = repository.belay_dir.join("lifecycle/writer.lock");
+    if path_exists(&lock)? {
+        require_regular_file(&lock)?;
+    } else {
+        write_if_missing(&lock, b"")?;
+    }
 
     ensure_gitignore(&repository.belay_dir.join(".gitignore"))?;
     Ok(())
