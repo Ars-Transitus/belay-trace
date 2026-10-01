@@ -1,0 +1,33 @@
+{
+  "proposal_only": true,
+  "target": {
+    "page_id": "3b8c2ad7-b431-80d7-a0a8-d78e58d2392b",
+    "result_area_id": "omnia-belay-dogfood-OMNIA-DOGFOOD-001-r1"
+  },
+  "placement": "Append one new dedicated toggle at end of canonical Plan; preserve existing blocks/properties/status",
+  "heading": "Belay dogfood result — OMNIA-DOGFOOD-001 r1",
+  "capsule_digest": "sha256:dbfe4837efed8a2d4803fb883c6214b9b3064f8df9679e7ea82c76064160177c",
+  "result": {
+    "summary": {
+      "execution": "completed",
+      "verification": "verified",
+      "human_acceptance": "pending",
+      "lifecycle": "active",
+      "source_freshness": "unknown"
+    },
+    "artifact_refs": [
+      "Contract OMNIA-DOGFOOD-001 revision 1; sha256:57f6467d37842bf6d42d5d7c10534c79d887693dd7362722118e5316d9ac6c17",
+      "Isolated local commit b0492bad4aeddaf5f4468dd39e55bf279fc4504f",
+      "Evidence EVD-b5e18075af64c5129ba02a1c96d1abcd; AC-001 through AC-004 verified; 14 diagnostic tests and independent review passed",
+      "evaluation/omnia-080/dogfood-diagnostic.patch",
+      "evaluation/omnia-080/dogfood-capsule.json"
+    ],
+    "unresolved": [
+      "Human acceptance pending; active human operation/review time not yet measured",
+      "Core source_freshness remains unknown; operator independently refetched complete unchanged Plan before execution",
+      "OB-11 adoption and OB-REL01 release remain pending"
+    ],
+    "decision_candidates": []
+  },
+  "operation_marker_notice": "Generated operation-ID and exact canonical operation content will be included after explicit permission; no operation prepared yet"
+}

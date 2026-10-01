@@ -1,0 +1,50 @@
+{
+  "case_id": "OB-EVAL-CODE-001",
+  "case_revision": 2,
+  "started_at": "2026-10-01T12:30:18.464933+00:00",
+  "events": [
+    {
+      "kind": "core-apply",
+      "result": "applied; exact retry unchanged; same durable receipt"
+    },
+    {
+      "kind": "integration-defect",
+      "result": "Plan implements Goal rejected by legacy Work resolver",
+      "action": "T021 repair; retain immutable Contract and receipt"
+    },
+    {
+      "kind": "integration-repaired",
+      "result": "Independent 6-test review pass; same Contract Work WRK-20261001T214150-001-diagnostic-error-path created using repaired external operator binary; frozen clone code baseline unchanged"
+    },
+    {
+      "kind": "context-and-identity",
+      "result": "Actual focused context includes all 4 AC and immutable boundaries; receipt-bound identity ledger rebuild then no-op succeeded"
+    },
+    {
+      "kind": "diagnostic-review-repair",
+      "result": "AC003 unknown-key punctuation path ambiguity found by independent review; bounded repair before adoption",
+      "evidence": "EVD-1a1bc8f61825f7aa3a0dd7777629403a"
+    },
+    {
+      "kind": "diagnostic-verified",
+      "commit": "b0492bad4aeddaf5f4468dd39e55bf279fc4504f",
+      "evidence": "EVD-b5e18075af64c5129ba02a1c96d1abcd",
+      "result": "14 diagnostic tests and independent review pass; all4 AC Capsule verified; human pending/source unknown retained; integrated reviewed files into root"
+    },
+    {
+      "kind": "authorized-notion-append",
+      "operation_id": "OP-7d0abb1c1ba4842425927029ffd1fd48",
+      "result": "applied; exactly one toggle and exact all-child readback",
+      "block_id": "3ecc2ad7-b431-8117-bcff-e722daa9f216"
+    }
+  ],
+  "human_intent_reconfirmations": 0,
+  "human_active_minutes": null,
+  "human_review_minutes": null,
+  "measurement_note": "Human time is not inferred from assistant wall-clock; record human-reported active review when result is presented. Area selection was new configuration, not reconfirmation of lost intent.",
+  "local_timing_file": "dogfood-timing.json",
+  "status": "delivery-authorized",
+  "local_verified_at": "2026-10-01T12:50:21.126790+00:00",
+  "human_time_status": "unmeasured (explicit user report)",
+  "delivery_decision": "User explicitly authorized commit/push/PR/main merge despite unmeasured human time; numerical usability gate not claimed passed"
+}

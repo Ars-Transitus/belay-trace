@@ -1,0 +1,18 @@
+{
+  "product_commit": "457136c4c1861742d195c8e881823630ad7ebd00",
+  "product_hash_count": 35,
+  "product_hash_mismatches": [],
+  "binary_hash_matches": true,
+  "inherited_document_hashes_match": true,
+  "storage_schema": 2,
+  "legacy_writer_process_snapshot": "No belay/cargo process observed via permitted ps comm snapshot; no guarantee against future starts",
+  "legacy_config_gate": "pre-0.7 config rejects schema != 1; src/config.rs",
+  "writer_for_this_task": "target/release/belay 0.7.0",
+  "downgrade_performed": false,
+  "runtime_tests_rerun": false,
+  "design_decisions_pending": [
+    "snapshot Git/backup policy",
+    "offline mutation policy"
+  ],
+  "ob_eval_approved": false
+}

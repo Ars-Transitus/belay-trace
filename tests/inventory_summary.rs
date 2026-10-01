@@ -776,7 +776,8 @@ fn packed_original_missing_from_index_retains_counts_and_provenance() {
     .unwrap();
     store::set_status(&repo, &work.display_id, EntryStatus::Completed).unwrap();
     let before = summary::source_binding(&repo, &work.display_id).unwrap();
-    let preview = belay_trace::pack::preview(&repo, &[work.display_id.clone()]).unwrap();
+    let preview =
+        belay_trace::pack::preview(&repo, std::slice::from_ref(&work.display_id)).unwrap();
     belay_trace::pack::apply(&repo, &preview).unwrap();
     let connection = belay_trace::database::open(&repo.database_path()).unwrap();
     connection

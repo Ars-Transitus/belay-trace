@@ -12,6 +12,7 @@ use crate::entry::{
     EntryLink, EntryStatus, EntryType, LinkRelation, MetadataValue, parse_entry_reference_id,
 };
 use crate::error::BelayError;
+use crate::mutation;
 use crate::repository::Repository;
 use crate::store::{self, MutationOutcome};
 
@@ -583,7 +584,7 @@ pub fn pending(repository: &Repository, run_id: &str) -> Result<PendingPreview, 
         .ok_or_else(|| validation_error("Route run has no Materialization Preview"))?;
     let preview: MaterializationPreview =
         read_artifact(&run_path, preview_ref, "Materialization Preview")?;
-    if preview_hash(&preview)? != preview.preview_hash {
+    if !preview_digest_matches(&preview)? {
         return validation("Materialization Preview content does not match its preview hash");
     }
     Ok(PendingPreview {
@@ -624,7 +625,7 @@ pub fn apply(
     if preview.preview_hash != approved_preview_hash {
         return validation("approved preview hash does not match the latest preview");
     }
-    if preview_hash(&preview)? != preview.preview_hash {
+    if !preview_digest_matches(&preview)? {
         return validation("Materialization Preview content does not match its preview hash");
     }
     if manifest.phase == RoutePhase::Previewed {
@@ -883,9 +884,10 @@ fn apply_operation(
         } => {
             let from = resolve_target(from, aliases)?;
             let to = resolve_target(to, aliases)?;
-            let expected_revision = expected_revisions.get(&from).copied().ok_or_else(|| {
-                validation_error(format!("missing preview revision precondition for {from}"))
-            })?;
+            let expected_revision = mutation::revision_precondition(expected_revisions, &from)
+                .ok_or_else(|| {
+                    validation_error(format!("missing preview revision precondition for {from}"))
+                })?;
             let outcome = store::route_link_if_revision(
                 repository,
                 run_id,
@@ -916,11 +918,12 @@ fn apply_operation(
             status,
         } => {
             let target = resolve_target(target, aliases)?;
-            let expected_revision = expected_revisions.get(&target).copied().ok_or_else(|| {
-                validation_error(format!(
-                    "missing preview revision precondition for {target}"
-                ))
-            })?;
+            let expected_revision = mutation::revision_precondition(expected_revisions, &target)
+                .ok_or_else(|| {
+                    validation_error(format!(
+                        "missing preview revision precondition for {target}"
+                    ))
+                })?;
             let outcome = store::route_set_status_if_revision(
                 repository,
                 run_id,
@@ -1777,7 +1780,13 @@ fn coverage_basis_fingerprint(repository: &Repository) -> Result<String, BelayEr
 fn preview_hash(preview: &MaterializationPreview) -> Result<String, BelayError> {
     let mut value = preview.clone();
     value.preview_hash.clear();
-    json_hash(&value)
+    mutation::content_digest(&value)
+}
+
+fn preview_digest_matches(preview: &MaterializationPreview) -> Result<bool, BelayError> {
+    let mut value = preview.clone();
+    value.preview_hash.clear();
+    mutation::digest_matches(&value, &preview.preview_hash)
 }
 
 fn json_hash<T: Serialize>(value: &T) -> Result<String, BelayError> {
@@ -2027,6 +2036,10 @@ mod tests {
             preview_hash: String::new(),
         };
         let first = preview_hash(&preview).expect("hash preview");
+        assert_eq!(
+            first,
+            "e05ca24d0824712481602e85741ce90dd6d270e137c23af11f65594497b0cca2"
+        );
         preview.preview_hash = first.clone();
         assert_eq!(preview_hash(&preview).expect("rehash preview"), first);
         preview.proposal_hash = "changed".to_owned();

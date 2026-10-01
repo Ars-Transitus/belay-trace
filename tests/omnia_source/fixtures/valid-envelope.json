@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "bundle_id": "SYNTHETIC-BUNDLE-007B",
+  "retrieved_at": "2026-10-01T09:00:00Z",
+  "config": {
+    "area_id": "AREA-SYNTHETIC",
+    "data_source_id": "DS-SYNTHETIC",
+    "repository": "github.com/Ars-Transitus/belay-trace",
+    "connector": "notion-mcp"
+  },
+  "selected_source_ids": ["SRC-ROOT"],
+  "sources": [
+    {
+      "id": "SRC-ROOT",
+      "page_id": "PAGE-ROOT",
+      "url": "synthetic://notion/page-root",
+      "retrieved_at": "2026-10-01T09:00:00Z",
+      "edited_at": "2026-10-01T08:30:00Z",
+      "raw_snapshot_ref": "local-untracked://synthetic/page-root.json",
+      "raw_snapshot": {
+        "id": "PAGE-ROOT",
+        "blocks": [{"type": "paragraph", "text": "Synthetic outcome"}]
+      },
+      "normalized_snapshot": {
+        "id": "PAGE-ROOT",
+        "text": "Synthetic outcome"
+      },
+      "required_dependency_ids": ["SRC-DEPENDENCY"],
+      "boundary": {
+        "area_id": "AREA-SYNTHETIC",
+        "data_source_id": "DS-SYNTHETIC",
+        "repository": "github.com/Ars-Transitus/belay-trace",
+        "connector": "notion-mcp",
+        "source_id": "SRC-ROOT",
+        "page_id": "PAGE-ROOT"
+      },
+      "completeness": {
+        "truncated": false,
+        "unknown_block_count": 0,
+        "unknown_block_ids": [],
+        "pagination_complete": true,
+        "continuation": null,
+        "permission_denied": false,
+        "deleted": false,
+        "archived": false,
+        "relation_cycle": false
+      }
+    },
+    {
+      "id": "SRC-DEPENDENCY",
+      "page_id": "PAGE-DEPENDENCY",
+      "url": "synthetic://notion/page-dependency",
+      "retrieved_at": "2026-10-01T09:00:00Z",
+      "raw_snapshot_ref": "local-untracked://synthetic/page-dependency.json",
+      "raw_snapshot": {"id": "PAGE-DEPENDENCY", "blocks": []},
+      "normalized_snapshot": {"id": "PAGE-DEPENDENCY", "text": ""},
+      "required_dependency_ids": [],
+      "boundary": {
+        "area_id": "AREA-SYNTHETIC",
+        "data_source_id": "DS-SYNTHETIC",
+        "repository": "github.com/Ars-Transitus/belay-trace",
+        "connector": "notion-mcp",
+        "source_id": "SRC-DEPENDENCY",
+        "page_id": "PAGE-DEPENDENCY"
+      },
+      "completeness": {
+        "truncated": false,
+        "unknown_block_count": 0,
+        "unknown_block_ids": [],
+        "pagination_complete": true,
+        "continuation": null,
+        "permission_denied": false,
+        "deleted": false,
+        "archived": false,
+        "relation_cycle": false
+      }
+    }
+  ]
+}

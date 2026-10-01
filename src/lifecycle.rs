@@ -137,11 +137,35 @@ pub fn ensure_v2(repository: &Repository) -> Result<(), BelayError> {
     let path = repository.belay_dir.join("config.toml");
     let raw = store::read_loose_managed_file(repository, &path)?;
     let mut config = crate::config::Config::load(&path)?;
-    if config.schema_version == 2 {
+    if config.schema_version >= 2 {
         return Ok(());
     }
     config.schema_version = 2;
     // Config has no Markdown semantic hash; this replacement is a raw CAS.
+    replace_raw(
+        repository,
+        &path,
+        config.render()?.as_bytes(),
+        &hash(raw.as_bytes()),
+    )
+}
+pub fn ensure_contract_v3(
+    repository: &Repository,
+    legacy_writers_quiesced: bool,
+) -> Result<(), BelayError> {
+    let _guard = writer_lock(repository)?;
+    let path = repository.belay_dir.join("config.toml");
+    let raw = store::read_loose_managed_file(repository, &path)?;
+    let mut config = crate::config::Config::load(&path)?;
+    if config.schema_version >= crate::config::CONTRACT_STORAGE_SCHEMA_VERSION {
+        return Ok(());
+    }
+    if !legacy_writers_quiesced {
+        return invalid(
+            "first Contract storage schema 3 upgrade requires explicit acknowledgement that legacy writers and uncoordinated editors are quiesced",
+        );
+    }
+    config.schema_version = crate::config::CONTRACT_STORAGE_SCHEMA_VERSION;
     replace_raw(
         repository,
         &path,

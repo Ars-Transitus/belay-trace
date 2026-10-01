@@ -25,6 +25,12 @@ jobs:
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --all-targets --locked
+      - name: Verify Omnia helpers
+        run: |
+          python3 -m unittest discover -s tests/omnia_contract
+          python3 -m unittest discover -s tests/omnia_source
+          python3 -m unittest discover -s tests/omnia_ledger
+          python3 -m unittest discover -s tests/omnia_consolidate
       - name: Rebuild and report tracked Belay state
         run: |
           mkdir -p .belay/state .belay/evidence

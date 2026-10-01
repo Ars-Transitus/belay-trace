@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 
 [storage]
 database = "state/belay.sqlite"
@@ -6,3 +6,11 @@ entries = "entries"
 
 [features]
 embeddings = "disabled"
+
+[lint]
+ambiguous-terms = []
+allowed-terms = []
+
+[verify]
+stale-after-commits = 30
+stale-after-days = 14

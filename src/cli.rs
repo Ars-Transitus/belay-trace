@@ -576,6 +576,31 @@ Exit Status:
 Related Commands:
   `belay context compile`, `belay show`, `belay sync`, and `belay doctor`."#;
 
+const CONTRACT_AFTER_HELP: &str = r#"Behavior and Side Effects:
+  Validate is read-only. Preview additionally verifies the configured Git remote,
+  exact HEAD and an adapter-supplied source freshness observation. The first Apply
+  upgrade to storage schema 3 requires --legacy-writers-quiesced, acknowledging
+  that already-running older writers and uncoordinated editors have been stopped;
+  the schema gate only makes subsequently opened schema-2-only writers reject the
+  repository. Apply then stores an immutable original, durable intent, Goal/Plan projections
+  and a filesystem receipt. Apply never fetches a source or claims live freshness.
+
+Examples:
+  belay contract validate --file contract.json
+  belay contract preview --file contract.json --source-freshness observed-current
+  belay contract apply --file contract.json --source-freshness observed-current --approve sha256:... --legacy-writers-quiesced
+  belay contract show OMNIA-DEMO-001 --revision 1
+
+Exit Status:
+  0  Contract operation completed
+  3  Repository is not initialized
+  4  Contract, lifecycle, freshness, target or invocation is invalid
+  5  Preview, identity, original, projection or receipt conflicts
+  6  Durable storage failed
+
+Related Commands:
+  `belay show`, `belay sync`, and `belay rebuild`."#;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "belay",
@@ -644,6 +669,12 @@ enum Command {
         after_help = CONTEXT_AFTER_HELP
     )]
     Context(ContextArgs),
+
+    #[command(
+        about = "Validate, preview, apply, and inspect Omnia Contracts",
+        after_help = CONTRACT_AFTER_HELP
+    )]
+    Contract(ContractArgs),
 
     #[command(
         about = "List deterministic archive candidates",
@@ -926,6 +957,118 @@ struct ContextArgs {
 struct ArchiveArgs {
     #[command(subcommand)]
     command: ArchiveCommand,
+}
+
+#[derive(Debug, Args)]
+struct ContractArgs {
+    #[command(subcommand)]
+    command: ContractCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum ContractCommand {
+    #[command(about = "Strictly validate a canonical Contract JSON file")]
+    Validate(ContractFileArgs),
+    #[command(about = "Preview deterministic Goal and Plan projections")]
+    Preview(ContractObservedArgs),
+    #[command(about = "Apply an exact approved Contract preview")]
+    Apply(ContractApplyArgs),
+    #[command(about = "Show a durable completed Contract receipt")]
+    Show(ContractShowArgs),
+    #[command(about = "Produce a deterministic read-only Outcome Capsule")]
+    Capsule(ContractCapsuleArgs),
+}
+
+#[derive(Debug, Args)]
+struct ContractFileArgs {
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+}
+
+#[derive(Debug, Args)]
+struct ContractObservedArgs {
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+    #[arg(long, value_enum)]
+    source_freshness: ContractFreshness,
+}
+
+#[derive(Debug, Args)]
+struct ContractApplyArgs {
+    #[arg(long, value_name = "PATH")]
+    file: PathBuf,
+    #[arg(long, value_name = "SHA256")]
+    approve: String,
+    #[arg(long, value_enum)]
+    source_freshness: ContractFreshness,
+    /// Acknowledge that legacy writers and uncoordinated editors are stopped for the first schema 3 upgrade.
+    #[arg(long)]
+    legacy_writers_quiesced: bool,
+}
+
+#[derive(Debug, Args)]
+struct ContractShowArgs {
+    contract_id: String,
+    #[arg(long)]
+    revision: u32,
+}
+
+#[derive(Debug, Args)]
+struct ContractCapsuleArgs {
+    #[arg(long)]
+    contract_id: String,
+    #[arg(long)]
+    revision: u32,
+    #[arg(long)]
+    as_of: String,
+    #[arg(long, value_enum)]
+    execution: CapsuleExecution,
+    #[arg(long, value_enum, default_value = "json")]
+    format: CapsuleFormat,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CapsuleExecution {
+    NotStarted,
+    Running,
+    Paused,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CapsuleFormat {
+    Json,
+    Human,
+}
+
+impl From<CapsuleExecution> for crate::capsule::Execution {
+    fn from(value: CapsuleExecution) -> Self {
+        match value {
+            CapsuleExecution::NotStarted => Self::NotStarted,
+            CapsuleExecution::Running => Self::Running,
+            CapsuleExecution::Paused => Self::Paused,
+            CapsuleExecution::Completed => Self::Completed,
+            CapsuleExecution::Cancelled => Self::Cancelled,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ContractFreshness {
+    ObservedCurrent,
+    Changed,
+    Unknown,
+}
+
+impl From<ContractFreshness> for crate::contract::SourceFreshness {
+    fn from(value: ContractFreshness) -> Self {
+        match value {
+            ContractFreshness::ObservedCurrent => Self::ObservedCurrent,
+            ContractFreshness::Changed => Self::Changed,
+            ContractFreshness::Unknown => Self::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -1564,6 +1707,61 @@ fn execute(cli: Cli, current_dir: &Path) -> Result<(), BelayError> {
                 )?
             };
             print!("{}", bundle.text);
+            Ok(())
+        }
+        Command::Contract(arguments) => {
+            match arguments.command {
+                ContractCommand::Validate(arguments) => {
+                    let contract = crate::contract::load_contract(&arguments.file)?;
+                    print_json(
+                        &serde_json::json!({"kind":"contract","valid":true,"contract_digest":contract.contract_digest}),
+                    )?;
+                }
+                ContractCommand::Preview(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    let contract = crate::contract::load_contract(&arguments.file)?;
+                    print_json(&crate::contract::preview(
+                        &repository,
+                        &contract,
+                        arguments.source_freshness.into(),
+                    )?)?;
+                }
+                ContractCommand::Apply(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    let contract = crate::contract::load_contract(&arguments.file)?;
+                    print_json(&crate::contract::apply(
+                        &repository,
+                        &contract,
+                        &arguments.approve,
+                        arguments.source_freshness.into(),
+                        arguments.legacy_writers_quiesced,
+                    )?)?;
+                }
+                ContractCommand::Show(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    print_json(&crate::contract::show(
+                        &repository,
+                        &arguments.contract_id,
+                        arguments.revision,
+                    )?)?;
+                }
+                ContractCommand::Capsule(arguments) => {
+                    let repository = repository::discover(current_dir)?;
+                    let capsule = crate::capsule::produce(
+                        &repository,
+                        &arguments.contract_id,
+                        arguments.revision,
+                        &arguments.as_of,
+                        arguments.execution.into(),
+                    )?;
+                    match arguments.format {
+                        CapsuleFormat::Json => print_json(&capsule)?,
+                        CapsuleFormat::Human => {
+                            print!("{}", crate::capsule::render_uncovered(&capsule))
+                        }
+                    }
+                }
+            }
             Ok(())
         }
         Command::Inventory(arguments) => {

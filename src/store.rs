@@ -1,6 +1,6 @@
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 #[cfg(unix)]
 use std::ffi::OsString;
 use std::fs;
@@ -388,7 +388,7 @@ fn derive_work_goal(
     let plan_goals = plan_goal_links(connection, database_path, &plan)?;
     if plan_goals.is_empty() {
         return validation(format!(
-            "Plan {} has no fulfills link to a Goal",
+            "Plan {} has no fulfills or implements link to a Goal",
             plan.display_id
         ));
     }
@@ -407,7 +407,7 @@ fn derive_work_goal(
                 && (link.fragment.is_none() || link.fragment == goal.fragment)
         }) {
             return validation(format!(
-                "Plan {} task #{} Goal item {} is not covered by a Plan fulfills link",
+                "Plan {} task #{} Goal item {} is not covered by a Plan Goal link",
                 plan.display_id, task_fragment, goal_item
             ));
         }
@@ -440,7 +440,7 @@ fn derive_work_goal(
             [link] => *link,
             [] => {
                 return validation(format!(
-                    "Plan {} task #{} Goal item {} is ambiguous or not covered by a Plan fulfills link",
+                    "Plan {} task #{} Goal item {} is ambiguous or not covered by a Plan Goal link",
                     plan.display_id, task_fragment, goal_item
                 ));
             }
@@ -469,8 +469,12 @@ fn plan_goal_links(
     plan: &Entry,
 ) -> Result<Vec<EntryReferenceParts>, BelayError> {
     let mut goals = Vec::new();
+    let mut canonical = BTreeSet::new();
     for link in &plan.links {
-        if link.relation != LinkRelation::Fulfills {
+        if !matches!(
+            link.relation,
+            LinkRelation::Fulfills | LinkRelation::Implements
+        ) {
             continue;
         }
         let reference = parse_entry_reference_id(&link.id)?;
@@ -480,7 +484,9 @@ fn plan_goal_links(
             continue;
         }
         validate_reference_fragment(connection, database_path, &reference)?;
-        goals.push(reference);
+        if canonical.insert(reference.canonical_id()) {
+            goals.push(reference);
+        }
     }
     Ok(goals)
 }

@@ -883,6 +883,21 @@ pub(crate) fn freshness_at(
     }
 }
 
+pub(crate) fn record_freshness_at(
+    repository: &Repository,
+    record: &EvidenceRecord,
+    as_of: DateTime<Utc>,
+) -> Freshness {
+    let head = current_head(repository).ok();
+    freshness_at(
+        repository,
+        head.as_deref(),
+        &record.commit_sha,
+        &record.captured_at,
+        as_of,
+    )
+}
+
 fn time_freshness(
     repository: &Repository,
     captured_at: DateTime<Utc>,

@@ -1,0 +1,53 @@
+{
+  "scope": "OB-00 source identity and document completeness; not feature runtime tests or design approval",
+  "baseline": "457136c4c1861742d195c8e881823630ad7ebd00",
+  "head": "df48ef171f1c3f8e602546607af6029037b9097a",
+  "product_hash_count": 35,
+  "product_hash_mismatches": [],
+  "binary_hash_matches": true,
+  "product_diff_empty": true,
+  "reference_files": [
+    "src/agent.rs",
+    "src/cli.rs",
+    "src/context.rs",
+    "src/context_sections.rs",
+    "src/coverage.rs",
+    "src/entry.rs",
+    "src/evidence.rs",
+    "src/export.rs",
+    "src/inventory.rs",
+    "src/lifecycle.rs",
+    "src/pack.rs",
+    "src/reconcile.rs",
+    "src/route.rs",
+    "src/summary.rs",
+    "tests/cli.rs",
+    "tests/cli_inventory_lifecycle.rs",
+    "tests/context_sections.rs",
+    "tests/inventory_summary.rs",
+    "tests/lifecycle_storage.rs"
+  ],
+  "missing_reference_files": [],
+  "lifecycle_cases": [
+    "retry",
+    "同一版異内容",
+    "新revision",
+    "別委譲",
+    "cancel",
+    "expire",
+    "supersede",
+    "offline再開",
+    "source更新",
+    "投影手編集"
+  ],
+  "missing_cases": [],
+  "artifacts": {
+    "evaluation/omnia-080/inventory.md": "3c8cb2bb1528b90bfc63216c6c1d3b84679e5c90b2a9e88dd3c3c009a68c8949",
+    "evaluation/omnia-080/design-proposal.md": "81aa7398c07e89b7b40a832e13ce12f9cff7fd2ba0b9c55c4dce5c843303d159"
+  },
+  "runtime_tests_rerun": false,
+  "design_accepted": false,
+  "ob_eval_approved": false,
+  "storage_after_evidence": "schema 2; automatic 0.7 writer migration",
+  "legacy_writer_quiescence": "Unknown; process inspection denied by sandbox; no force downgrade"
+}

@@ -135,6 +135,7 @@ fn load_entries(
         .into_iter()
         .map(|(internal_id, source_path)| {
             let entry = store::load_entry(&transaction, &database_path, internal_id)?;
+            crate::contract::validate_entry_projection(repository, &entry)?;
             Ok(export_entry(entry, source_path.unwrap_or_default()))
         })
         .collect::<Result<Vec<_>, _>>()?;

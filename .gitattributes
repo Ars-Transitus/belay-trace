@@ -1,0 +1,3 @@
+
+# Preserve literal unified-diff evidence, including blank context lines.
+evaluation/omnia-080/dogfood-diagnostic.patch -whitespace

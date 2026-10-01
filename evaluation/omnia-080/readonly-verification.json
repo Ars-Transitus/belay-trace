@@ -1,0 +1,27 @@
+{
+  "scope": "OB02/03 synthetic read-only schema/compiler tests",
+  "focused_tests": 9,
+  "provenance_checks": [
+    "missing input_id rejected",
+    "missing input_revision rejected",
+    "missing confirmation_ref rejected",
+    "missing assumptions rejected",
+    "missing context_refs rejected",
+    "missing context source rejected"
+  ],
+  "file_hashes": {
+    "scripts/omnia_contract.py": "38dbaf79490f61f44ebbfed9c49c4b9db6d18868925117b3d2d2f01b0dc8167a",
+    "tests/omnia_contract/fixtures/capsule-cancelled.json": "ee3ad4bcfc729dd4bcd55739e9cfe879e24a6d4e223c7e1c3961862a9f6ea410",
+    "tests/omnia_contract/fixtures/capsule-expired-missing.json": "56c2bbd60fb4b7b737ce7beecef94a4c032fb1d29b033ae61f2e7b0899d0b074",
+    "tests/omnia_contract/fixtures/capsule-failed.json": "172361cfed636529e48f1ede25e0b6acaaca53bb6593de4438f5341ea75b43ab",
+    "tests/omnia_contract/fixtures/confirmed-input.json": "aa4f33237d19902386b8fbcb0156e929c2e19f18f7a56768eb362a3aec5f126d",
+    "tests/omnia_contract/golden/contract-v1.json": "65063ff27cfad0f9be53bb5b423b19d4f1de72e5d06f7f5f34dad79993456d6f",
+    "tests/omnia_contract/golden/projection-preview.json": "c130b2f45801fe2cf65648c616cbf6e7b91b2536e8795a1fadd449db606f6f0f",
+    "tests/omnia_contract/schemas/capsule-v1.schema.json": "4ad476c371d1a0e641403409d79c26621e1dec4eb4f647877332047c48042b24",
+    "tests/omnia_contract/schemas/confirmed-input.schema.json": "9c8703179c5a3a2615de2bcc4a18c8baadd52e156417140ccf26d0d4b50480ae",
+    "tests/omnia_contract/schemas/contract-v1.schema.json": "a1e83c329428e61ba6e3292fe346ff575985cd735e1278ad15dcbac355474526",
+    "tests/omnia_contract/test_contract.py": "cbf6943a9762874c354f7825b6d0fa559a4ee8f33ad800eeb9805021aebf31d4"
+  },
+  "full_release_verified": false,
+  "ob_eval_approved": false
+}

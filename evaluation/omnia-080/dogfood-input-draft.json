@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "status": "draft",
+  "contract_id": "OMNIA-DOGFOOD-001",
+  "revision": 1,
+  "issued_at": "2026-10-01T00:00:00Z",
+  "expires_at": "2026-10-08T00:00:00Z",
+  "compiler_version": "omnia-contract-compiler/1",
+  "outcome": "Add machine-readable exact failing field path to Contract helper validation diagnostics",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "text": "Human-confirmed OB-EVAL Code case: add structured exact failing field path; existing error text and exit behavior remain compatible.",
+      "source_refs": [
+        "SRC-PLAN"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-001",
+      "text": "Existing error text and exit code remain compatible",
+      "source_refs": [
+        "SRC-PLAN"
+      ]
+    },
+    {
+      "id": "AC-002",
+      "text": "Invalid source completeness reports exact source field in structured error_path",
+      "source_refs": [
+        "SRC-PLAN"
+      ]
+    },
+    {
+      "id": "AC-003",
+      "text": "Unknown/missing field diagnostics expose a stable explicit path",
+      "source_refs": [
+        "SRC-PLAN"
+      ]
+    },
+    {
+      "id": "AC-004",
+      "text": "Successful output remains unchanged",
+      "source_refs": [
+        "SRC-PLAN"
+      ]
+    }
+  ],
+  "constraints": [
+    "Single Belay repository; modify only helper/tests/documentation",
+    "Preserve existing output on success and original error text/exit code",
+    "Use fixed source snapshot and confirmed case; no source reinterpretation"
+  ],
+  "non_goals": [
+    "Publication, tag push, registry release, user installation",
+    "Erwin or installed consumer edits",
+    "Automatic Notion status or Decision promotion"
+  ],
+  "unknowns": [
+    "Freeze isolated baseline commit before issuance"
+  ],
+  "delegation": {
+    "actor": "Codex implementation under native sandbox",
+    "scope": "scripts/omnia_contract.py tests/omnia_contract/test_contract.py and diagnostic documentation",
+    "allowed_operations": [
+      "local code edit",
+      "local tests",
+      "local fixture commit",
+      "Evidence record"
+    ]
+  },
+  "verification": [
+    "Focused Python tests including exact invalid field paths and successful-output compatibility",
+    "Independent review of exact changed artifact",
+    "Capsule lists all four AC and their exact Evidence bindings"
+  ],
+  "stop_conditions": [
+    "Mandatory source unavailable/incomplete or meaning changed",
+    "Cancellation, supersede, expiry or human stop",
+    "Any action outside delegated paths or external write without specific permission"
+  ],
+  "target": {
+    "repository": "github.com/Ars-Transitus/belay-trace",
+    "base_commit": "457136c4c1861742d195c8e881823630ad7ebd00"
+  },
+  "source_bundle": {
+    "acquisition_digest": "sha256:008c3a0765c546d4ceb2adfe6c9b97616c8d307052db9012d5db5da4f90f0591",
+    "bundle_digest": "sha256:cd7b8bac8b07749e46bb0282570549d7a82e4f4bd4c16fd82fc292235a672deb",
+    "bundle_id": "BUNDLE-DOGFOOD-001",
+    "sources": [
+      {
+        "complete": true,
+        "edited_at": "2026-09-30T12:51:00Z",
+        "id": "SRC-PLAN",
+        "normalized_sha256": "sha256:c426571eefea1e3f03abc41d60be8d12f7e4f8a4d01b869aebac62980c94fc28",
+        "raw_sha256": "sha256:e5a01113b6f1059e4b8379b6a89085249004bcaf7fc30eb39cf82c67390b084b",
+        "raw_snapshot_ref": ".belay/local-sources/SRC-PLAN-20261001T121123Z.json",
+        "retrieved_at": "2026-10-01T12:11:23Z",
+        "url": "https://app.notion.com/p/Omnia-Belay-Integration-3b8c2ad7b43180d7a0a8d78e58d2392b"
+      }
+    ]
+  },
+  "input_id": "INPUT-DOGFOOD-001",
+  "input_revision": 1,
+  "confirmation_ref": "belay:EVD-ae60bd4fda1b275020c5298a54405199",
+  "assumptions": [
+    "Area is explicitly selected by human; remote Area relationship is not independently verified",
+    "The exact diagnostic case comes from human-confirmed OB-EVAL, with the Notion Plan supplying integration requirements"
+  ],
+  "context_refs": [
+    "SRC-PLAN"
+  ]
+}

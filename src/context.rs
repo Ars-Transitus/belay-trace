@@ -90,7 +90,18 @@ pub fn generate(
         .min(selection_budget.saturating_div(3))
         .max(1);
     let task = truncate_at_boundary(task.trim(), task_budget);
-    let header = render_header(format, &task, budget, selection_budget);
+    let mut header = render_header(format, &task, budget, selection_budget);
+    let mut contract_sources = BTreeSet::new();
+    for candidate in &candidates {
+        let shown = crate::store::show(repository, &candidate.result.display_id)?;
+        if let Some(boundary) = crate::contract::context_for_entry(repository, &shown.entry)? {
+            if contract_sources.insert(boundary.source_id) {
+                header.push_str("\n## Contract boundary\n\n");
+                header.push_str(&boundary.content);
+                header.push('\n');
+            }
+        }
+    }
     if estimate_tokens(&header) > selection_budget {
         return Err(BelayError::Validation {
             message: "context budget is too small for required output metadata".to_owned(),
@@ -277,6 +288,22 @@ pub fn compile(
     if let Some(warning) = summary_warning {
         exclusions.push(warning);
     }
+    let mut contract_sources = BTreeSet::new();
+    for display_id in selected.keys() {
+        let shown = crate::store::show(repository, display_id)?;
+        if let Some(boundary) = crate::contract::context_for_entry(repository, &shown.entry)? {
+            if contract_sources.insert(boundary.source_id.clone()) {
+                sections.push(context_section(
+                    &format!("contract-boundary:{}", boundary.source_id),
+                    "Contract boundary",
+                    true,
+                    0,
+                    vec![display_id.clone()],
+                    boundary.content,
+                ));
+            }
+        }
+    }
     for entry in &pool {
         let Some(reason) = selected.get(&entry.display_id) else {
             continue;
@@ -384,7 +411,7 @@ pub fn compile(
         .iter()
         .filter(|e| e.status == crate::entry::EntryStatus::Archived && !include_archived)
         .count();
-    sections.push(context_section("selection","Selection",true,0,vec![],format!("Related by query/link/seed; canonical IDs deduplicated. Summary context: retrieve focus for complete Task boundaries before execution. Unrelated scope excluded; archived excluded={excluded_archived}.{}",if exclusions.is_empty(){String::new()}else{format!("\n{}",exclusions.join("\n"))})));
+    sections.push(context_section("selection","Selection",true,5,vec![],format!("Related by query/link/seed; canonical IDs deduplicated. Summary context: retrieve focus for complete Task boundaries before execution. Unrelated scope excluded; archived excluded={excluded_archived}.{}",if exclusions.is_empty(){String::new()}else{format!("\n{}",exclusions.join("\n"))})));
     bundle_sections(
         &format!(
             "# Context: {}\n(compiled by belay, budget={budget})",
@@ -816,6 +843,14 @@ pub fn compile_working_set(
 ) -> Result<ContextBundle, BelayError> {
     use crate::entry::EntryStatus;
     let pool = compile_entries(repository)?;
+    // Durable discovery keeps active Contracts visible independently of
+    // mutable task state. Validate every indexed projection as a separate
+    // fail-closed guard so damaged intent/receipt/original state cannot make a
+    // provenance-bearing entry silently become ordinary history.
+    for entry in &pool {
+        let shown = crate::store::show(repository, &entry.display_id)?;
+        crate::contract::validate_entry_projection(repository, &shown.entry)?;
+    }
     let mut evidence = ContextEvidence::load(repository)?;
     let current = pool
         .iter()
@@ -836,6 +871,16 @@ pub fn compile_working_set(
         })
         .collect::<Vec<_>>();
     let mut sections = Vec::new();
+    for contract in crate::contract::active_contexts(repository)? {
+        sections.push(context_section(
+            &format!("contract-boundary:{}", contract.boundary.source_id),
+            "Contract boundary",
+            true,
+            0,
+            contract.projection_ids,
+            contract.boundary.content,
+        ));
+    }
     let mut current_text = String::new();
     let mut refs = Vec::new();
     let mut next = String::new();
@@ -911,7 +956,7 @@ pub fn compile_working_set(
         "current",
         "Goals / Plans",
         true,
-        0,
+        5,
         refs,
         current_text,
     ));
@@ -992,7 +1037,6 @@ pub fn compile_focus(
     budget: usize,
 ) -> Result<ContextBundle, BelayError> {
     let shown = crate::store::show(repository, focus)?;
-    validate_indexed_source(repository, &shown.entry.display_id)?;
     let Some(fragment) = shown.fragment.as_ref() else {
         return Err(BelayError::Validation {
             message: "--focus requires a canonical fragment such as PLN-...#t-001".into(),
@@ -1004,19 +1048,34 @@ pub fn compile_focus(
     } else {
         fragment.section.clone()
     };
-    let mut sections = vec![context_section(
+    let mut sections = Vec::new();
+    let mut next_order = 0;
+    if let Some(boundary) = crate::contract::context_for_entry(repository, &shown.entry)? {
+        sections.push(context_section(
+            "contract-boundary",
+            "Contract boundary",
+            true,
+            next_order,
+            vec![shown.entry.display_id.clone()],
+            boundary.content,
+        ));
+        next_order += 1;
+    }
+    validate_indexed_source(repository, &shown.entry.display_id)?;
+    sections.push(context_section(
         "plan-boundaries",
         "Intent Brief",
         true,
-        0,
+        next_order,
         vec![shown.entry.display_id.clone()],
         boundary_text(&shown.entry.body, shown.entry.entry_type == EntryType::Plan),
-    )];
+    ));
+    next_order += 1;
     sections.push(context_section(
         "task",
         "Task",
         true,
-        1,
+        next_order,
         vec![canonical.clone()],
         format!(
             "Definition:\n{}\nSection:\n{}",
@@ -1058,7 +1117,7 @@ pub fn compile_focus(
                     "goal-item",
                     "Goal item",
                     true,
-                    2,
+                    next_order + 1,
                     vec![full],
                     format!(
                         "Definition:\n{}\n{}",
@@ -1070,19 +1129,19 @@ pub fn compile_focus(
                     "goal-boundaries",
                     "Goal boundaries",
                     true,
-                    3,
+                    next_order + 2,
                     vec![goal.entry.display_id.clone()],
                     boundary_text(&goal.entry.body, false),
                 ));
             } else {
-                sections.push(context_section("goal-item","Goal item",true,2,vec![],format!("{goal_item}: Unknown (no linked Goal; retrieve complete Plan before execution).")));
+                sections.push(context_section("goal-item","Goal item",true,next_order + 1,vec![],format!("{goal_item}: Unknown (no linked Goal; retrieve complete Plan before execution).")));
             }
         } else {
             sections.push(context_section(
                 "goal-item",
                 "Goal item",
                 true,
-                2,
+                next_order + 1,
                 vec![],
                 "Unknown (no Task mapping).".into(),
             ));
@@ -1094,7 +1153,7 @@ pub fn compile_focus(
         "evidence",
         "Evidence",
         true,
-        4,
+        next_order + 3,
         refs,
         format!(
             "{summary}\nRecorded state does not establish verification or execution authorization."

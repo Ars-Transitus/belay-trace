@@ -454,6 +454,15 @@ fn sync_one(
     stale_baseline: Option<&Baseline>,
     preference: Option<SyncPreference>,
 ) -> Result<&'static str, BelayError> {
+    if let Some(mirror) = mirror_record {
+        crate::contract::validate_entry_projection(repository, &mirror.entry)?;
+    }
+    if let Some(database) = database_record {
+        let database_path = repository.database_path();
+        let connection = database::open_read_only(&database_path)?;
+        let entry = store::load_entry(&connection, &database_path, database.internal_id)?;
+        crate::contract::validate_entry_projection(repository, &entry)?;
+    }
     match (database_record, mirror_record) {
         (None, None) => Err(BelayError::Conflict {
             message: format!("entry {display_id} is missing from both SQLite and Markdown"),
@@ -754,6 +763,9 @@ pub struct RebuildOutcome {
 pub fn rebuild(repository: &Repository) -> Result<RebuildOutcome, BelayError> {
     let _writer_guard = crate::lifecycle::writer_lock(repository)?;
     let inventory = discover_mirrors(repository)?;
+    for mirror in inventory.entries.values() {
+        crate::contract::validate_entry_projection(repository, &mirror.entry)?;
+    }
     validate_link_targets(&inventory)?;
     let database_path = repository.database_path();
     database_path
