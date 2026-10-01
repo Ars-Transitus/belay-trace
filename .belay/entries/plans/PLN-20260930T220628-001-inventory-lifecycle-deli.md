@@ -15,19 +15,33 @@ metadata: {}
 ---
 
 ## Intent Brief
+
 ### Problem
+
 Historical entries and Evidence need inspectable relevance, immutable parallel capture and reversible storage aggregation.
+
 ### Desired Outcome
-Implement the canonical Plan at https://app.notion.com/p/3ebc2ad7b43181df94b6c2629c3ec3d2; local fetched source is evaluation/inventory-lifecycle/canonical-plan.md.
+
+Implement the canonical Plan at <https://app.notion.com/p/3ebc2ad7b43181df94b6c2629c3ec3d2>; local fetched source is evaluation/inventory-lifecycle/canonical-plan.md.
+
 ### Success Signals
+
 All task acceptance, frozen evaluation and recovery checks pass; release only after BI-07 and LC06 adoption eligibility.
+
 ### Constraints
+
 Preserve all originals; no actual record status/archival changes without concrete user selection. No push/publication/install consumer edits. Existing user harness diff is excluded.
+
 ### Non-goals
+
 Omnia 0.8.0; semantic decisions in core; deleting raw originals or rewriting Git history.
+
 ### Assumptions
+
 Small reversible implementation choices are delegated to root by the original request. Current harness allows direct implementation and suitable local subagents. Numerical context targets approved in chat 2026-09-30.
+
 ## Delivery Map
+
 | ID | Goal item | Outcome / Task | Actor | State | Verification / Evidence |
 | --- | --- | --- | --- | --- | --- |
 | T-001 | SC-001 | BI-00: baseline and navigation evaluation | root | verified | release-final.json; evaluation-v2.md; final release Evidence |
@@ -59,6 +73,7 @@ Small reversible implementation choices are delegated to root by the original re
 | T-027 | SC-004 | BI-REL01: 0.7.0 release preparation | root | verified | release-final.json; evaluation-v2.md; final release Evidence |
 
 ## T-001
+
 - Objective: BI-00: baseline and navigation evaluation.
 - Scope: Corresponding BI-00 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -66,6 +81,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-002
+
 - Objective: BI-01: classification contract and fixtures.
 - Scope: Corresponding BI-01 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -73,6 +89,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-003
+
 - Objective: BI-EVAL: freeze evaluation and adoption criteria.
 - Scope: Corresponding BI-EVAL section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -80,6 +97,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-004
+
 - Objective: CX-01: required section and budget contract.
 - Scope: Corresponding CX-01 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -87,6 +105,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-005
+
 - Objective: BI-02: read-only inventory report.
 - Scope: Corresponding BI-02 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -94,6 +113,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-006
+
 - Objective: BI-03a: review procedure and operation preview.
 - Scope: Corresponding BI-03a section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -101,6 +121,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-007
+
 - Objective: BI-03b: stale-safe application and restoration fixtures.
 - Scope: Corresponding BI-03b section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -108,6 +129,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-008
+
 - Objective: BI-03c: selected real data reorganization.
 - Scope: Corresponding BI-03c section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -115,6 +137,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-009
+
 - Objective: BI-04a: shared section renderer.
 - Scope: Corresponding BI-04a section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -122,6 +145,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-010
+
 - Objective: BI-04b: live summary.
 - Scope: Corresponding BI-04b section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -129,6 +153,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-011
+
 - Objective: BI-05: compile relevance and budgets.
 - Scope: Corresponding BI-05 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -136,6 +161,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-012
+
 - Objective: BI-06: generated skill guidance.
 - Scope: Corresponding BI-06 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -143,6 +169,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-013
+
 - Objective: BI-07: context adoption evaluation.
 - Scope: Corresponding BI-07 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -150,6 +177,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-014
+
 - Objective: BI-LC00: storage revision retention contract.
 - Scope: Corresponding BI-LC00 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -157,6 +185,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-015
+
 - Objective: BI-LC01a: distributed Evidence identifiers.
 - Scope: Corresponding BI-LC01a section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -164,6 +193,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-016
+
 - Objective: BI-LC01b: atomic Evidence publication and index recovery.
 - Scope: Corresponding BI-LC01b section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -171,6 +201,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-017
+
 - Objective: BI-LC02a: provenance summary artifact.
 - Scope: Corresponding BI-LC02a section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -178,6 +209,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-018
+
 - Objective: BI-LC02b: summary guidance and quality fixtures.
 - Scope: Corresponding BI-LC02b section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -185,6 +217,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-019
+
 - Objective: BI-LC03a: validated pack reader and writer.
 - Scope: Corresponding BI-LC03a section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -192,6 +225,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-020
+
 - Objective: BI-LC03b: all source resolution and rebuild paths.
 - Scope: Corresponding BI-LC03b section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -199,6 +233,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-021
+
 - Objective: BI-LC04a: Evidence compaction preview apply recover.
 - Scope: Corresponding BI-LC04a section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -206,6 +241,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-022
+
 - Objective: BI-LC04b: terminal Work Review packing and restoration.
 - Scope: Corresponding BI-LC04b section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -213,6 +249,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-023
+
 - Objective: BI-LC04c: regenerable cache preview and cleanup.
 - Scope: Corresponding BI-LC04c section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -220,6 +257,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-024
+
 - Objective: BI-LC05: context summary and packed source integration.
 - Scope: Corresponding BI-LC05 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -227,6 +265,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-025
+
 - Objective: BI-LC06: end-to-end lifecycle adoption judgment.
 - Scope: Corresponding BI-LC06 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -234,6 +273,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-026
+
 - Objective: BI-DEV01: atomic local build deploy.
 - Scope: Corresponding BI-DEV01 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.
@@ -241,6 +281,7 @@ Small reversible implementation choices are delegated to root by the original re
 - Verification: Focused fixtures plus the corresponding frozen evaluation, with command/result provenance.
 
 ## T-027
+
 - Objective: BI-REL01: 0.7.0 release preparation.
 - Scope: Corresponding BI-REL01 section in evaluation/inventory-lifecycle/canonical-plan.md; exact implementation paths and design contracts recorded before delegation.
 - Steps: Resolve required predecessors from canonical Plan; implement within owned paths; verify acceptance; retain failure evidence.

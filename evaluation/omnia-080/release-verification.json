@@ -1,0 +1,10 @@
+{
+  "version": "0.8.0",
+  "product_commit": "7a21f34c7703e0cc31553c52803aae9136d029dd",
+  "rust_tests": 273,
+  "all_target_clippy": "pass",
+  "temporary_deploy_version": "belay 0.8.0",
+  "human_time": "unmeasured",
+  "delivery_authorization": "EVD-96048b381515d7b9c6c65579cab50ef0",
+  "ci_and_independent_review": "pending at recording; see PR40 current checks"
+}
